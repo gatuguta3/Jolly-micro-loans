@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="adminHMD professional admin dashboard template">
+  <title>Loan Registration | Jolly Micro Loans</title>
+
+  <link rel="stylesheet" href="../assets/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/vendors/bootstrap-icons/bootstrap-icons.css">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+
+<body>
+  <div class="admin-shell">
+    <div class="sidebar-backdrop" data-sidebar-close></div>
+
+    <aside class="admin-sidebar" id="adminSidebar" aria-label="Main navigation">
+      <div class="sidebar-header">
+        <a class="brand-mark" href="index.html" aria-label="adminHMD dashboard">
+          <span class="brand-icon"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i></span>
+          <span class="brand-copy">
+            <span class="brand-title">Jolly Micro Loans</span>
+            <span class="brand-subtitle">Admin </span>
+          </span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-link " href="index.html" aria-current="page">
+          <span class="nav-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a class="nav-link " href="clients.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Clients</span>
+        </a>
+
+        <a class="nav-link" href="guarantors.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Guarantors</span>
+        </a>
+
+        <a class="nav-link active" href="loans.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Loans</span>
+        </a>
+
+        <a class="nav-link " href="payments.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Payments</span>
+        </a>
+
+        <a class="nav-link" href="reports.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Reports</span>
+        </a>
+
+        
+      </nav>
+
+      <div class="sidebar-user">
+        <img class="avatar-img avatar-md sidebar-user-avatar" src="../assets/images/avatar/avatar.jpg" alt="Elizabeth Kamau">
+        <strong>Elizabeth Wangui</strong>
+        <small>Active Workspace</small>
+      </div>
+
+      <div class="sidebar-footer">
+        <span class="status-dot"></span>
+        <span class="sidebar-footer-text">System running smoothly</span>
+      </div>
+    </aside>
+
+    <div class="admin-main">
+
+      <nav class="navbar admin-navbar navbar-expand bg-white">
+        <div class="container-fluid px-3 px-lg-4">
+          <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-controls="adminSidebar" aria-expanded="true" aria-label="Toggle sidebar">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+
+          <form class="d-none d-md-flex ms-3 flex-grow-1" role="search">
+            <input class="form-control search-input" type="search" placeholder="Search users, orders, reports" aria-label="Search">
+          </form>
+
+          <div class="navbar-actions ms-auto">
+            <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme" title="Switch color theme">
+              <i class="bi bi-moon-stars" data-theme-icon aria-hidden="true"></i>
+            </button>
+            <div class="dropdown">
+              <button class="icon-button" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
+                <span class="notification-dot"></span>
+                <i class="bi bi-bell" aria-hidden="true"></i>
+              </button>
+              <div class="dropdown-menu dropdown-menu-end notification-menu">
+                <div class="dropdown-header fw-bold text-body">Notifications</div>
+                <a class="dropdown-item" href="users.html">
+                  <span class="notification-title">New user registered</span>
+                  <span class="notification-time">4 minutes ago</span>
+                </a>
+                <a class="dropdown-item" href="charts.html">
+                  <span class="notification-title">Revenue target reached</span>
+                  <span class="notification-time">32 minutes ago</span>
+                </a>
+                <a class="dropdown-item" href="settings.html">
+                  <span class="notification-title">Security review completed</span>
+                  <span class="notification-time">1 hour ago</span>
+                </a>
+              </div>
+            </div>
+
+            <div class="dropdown">
+              <button class="profile-button dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <img class="avatar-img avatar-sm" src="../assets/images/avatar/avatar.jpg" alt="Elizabeth Wangui">
+                <span class="profile-name d-none d-sm-inline">Elizabeth Wangui</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="profile.html">Profile</a></li>
+                <li><a class="dropdown-item" href="settings.html">Account settings</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="login.html">Sign out</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      
+
+     <main class="dashboard-content">
+  <div class="container-fluid px-3 px-lg-4 py-4">
+    <div class="page-heading">
+      <div class="page-heading-copy">
+        <span class="page-icon"><i class="bi bi-cash-coin" aria-hidden="true"></i></span>
+        <div>
+          <p class="eyebrow mb-1">Loan Management</p>
+          <h1 class="h3 mb-1">Create New Loan</h1>
+          <p class="text-muted mb-0">Register a new loan with client, guarantor, collateral, and repayment details.</p>
+        </div>
+      </div>
+      <div class="heading-actions">
+        <a class="btn btn-outline-secondary btn-sm" href="loans.html">
+          <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Loans
+        </a>
+      </div>
+    </div>
+
+    <section class="row g-3">
+      <div class="col-12 col-xl-8">
+        <form class="panel needs-validation" method="post" enctype="multipart/form-data" novalidate>
+          <div class="panel-header">
+            <div>
+              <h2 class="h5 mb-1 section-title">
+                <i class="bi bi-cash-coin" aria-hidden="true"></i>
+                <span>Loan Information</span>
+              </h2>
+              <p class="text-muted mb-0">Fill in the loan terms, client, guarantor, and collateral details.</p>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <!-- Client -->
+            <div class="col-md-6">
+              <label class="form-label" for="client">Client</label>
+              <div class="input-group">
+                <select class="form-select" id="client" name="client" required>
+                  <option value="">Choose registered client</option>
+                  <option>Sarah Ahmed (sarah@example.com)</option>
+                  <option>James Mwangi (james@example.com)</option>
+                  <option>Grace Wanjiku (grace@example.com)</option>
+                  <option>Peter Odhiambo (peter@example.com)</option>
+                </select>
+                <a class="btn btn-outline-secondary" href="client-registration.html" title="Add new client">
+                  <i class="bi bi-person-plus" aria-hidden="true"></i>
+                </a>
+              </div>
+              <div class="invalid-feedback">Please choose a client.</div>
+            </div>
+
+            <!-- Date of Issue -->
+            <div class="col-md-6">
+              <label class="form-label" for="issueDate">Date of Issue</label>
+              <input class="form-control" id="issueDate" name="issueDate" type="date" required>
+              <div class="invalid-feedback">Date of issue is required.</div>
+            </div>
+
+            <!-- Loan Type -->
+            <div class="col-md-6">
+              <label class="form-label" for="loanType">Loan Type</label>
+              <select class="form-select" id="loanType" name="loanType" required>
+                <option value="">Choose loan type</option>
+                <option value="personal">Personal Loan</option>
+                <option value="business">Business Loan</option>
+                <option value="auto">Auto Loan</option>
+                <option value="mortgage">Mortgage</option>
+                <option value="education">Education Loan</option>
+                <option value="emergency">Emergency Loan</option>
+              </select>
+              <div class="invalid-feedback">Choose a loan type.</div>
+            </div>
+
+            <!-- Principal Amount -->
+            <div class="col-md-6">
+              <label class="form-label" for="principal">Principal Amount (Ksh)</label>
+              <input class="form-control" id="principal" name="principal" type="number" min="1" step="0.01" required>
+              <div class="invalid-feedback">Enter a valid principal amount.</div>
+            </div>
+
+            <!-- Interest Rate (auto, based on amount) -->
+            <div class="col-md-6">
+              <label class="form-label" for="interestRate">Interest Rate (%)</label>
+              <input class="form-control" id="interestRate" name="interestRate" type="text" readonly>
+              <div class="form-text">Automatically assigned based on the principal amount.</div>
+            </div>
+
+            <!-- Total Due (auto) -->
+            <div class="col-md-6">
+              <label class="form-label" for="totalDue">Total Due (Ksh)</label>
+              <input class="form-control" id="totalDue" name="totalDue" type="text" readonly>
+              <div class="form-text">Principal + interest, calculated automatically.</div>
+            </div>
+
+            <!-- Due Date (auto) -->
+            <div class="col-md-6">
+              <label class="form-label" for="dueDate">Due Date</label>
+              <input class="form-control" id="dueDate" name="dueDate" type="date" readonly>
+              <div class="form-text">Based on loan type term and date of issue.</div>
+            </div>
+
+            <!-- Status (auto) -->
+            <div class="col-md-6">
+              <label class="form-label" for="status">Status</label>
+              <input class="form-control" id="status" name="status" type="text" value="Pending" readonly>
+              <div class="form-text">Status is assigned automatically.</div>
+            </div>
+
+            <!-- Guarantor -->
+            <div class="col-md-6">
+              <label class="form-label" for="guarantor">Guarantor</label>
+              <div class="input-group">
+                <select class="form-select" id="guarantor" name="guarantor" required>
+                  <option value="">Choose guarantor</option>
+                  <option>Sarah Ahmed (#001)</option>
+                  <option>James Mwangi (#002)</option>
+                  <option>Grace Wanjiku (#003)</option>
+                </select>
+                <a class="btn btn-outline-secondary" href="guarantors-registration.html" title="Add new guarantor">
+                  <i class="bi bi-person-plus" aria-hidden="true"></i>
+                </a>
+              </div>
+              <div class="invalid-feedback">Please choose a guarantor.</div>
+            </div>
+
+            <!-- Collateral Upload -->
+            <div class="col-12">
+              <label class="form-label" for="collateral">Collateral (Media Upload)</label>
+              <input class="form-control" id="collateral" name="collateral[]" type="file" accept="image/*,video/*" multiple>
+              <div class="form-text">Upload images or videos of the collateral. Accepted: JPG, PNG, GIF, MP4.</div>
+              <div id="collateralPreview" class="mt-2 d-flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- Notes -->
+            <div class="col-12">
+              <label class="form-label" for="notes">Additional Notes</label>
+              <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Any additional loan details or special conditions"></textarea>
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+            <a class="btn btn-outline-secondary" href="loans.html">Cancel</a>
+            <button class="btn btn-primary" type="submit">
+              <i class="bi bi-check-circle" aria-hidden="true"></i> Create Loan
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="col-12 col-xl-4">
+        <div class="panel h-100">
+          <h2 class="h5 mb-3 section-title">
+            <i class="bi bi-list-check" aria-hidden="true"></i>
+            <span>Loan Setup Checklist</span>
+          </h2>
+          <div class="activity-list">
+            <div class="activity-item">
+              <span class="activity-dot bg-success"></span>
+              <div>
+                <p class="mb-1 fw-semibold">Select registered client</p>
+                <p class="text-muted small mb-0">Only existing clients can be linked to a loan.</p>
+              </div>
+            </div>
+            <div class="activity-item">
+              <span class="activity-dot bg-primary"></span>
+              <div>
+                <p class="mb-1 fw-semibold">Choose loan type</p>
+                <p class="text-muted small mb-0">Interest rate is based on the amount; term depends on type.</p>
+              </div>
+            </div>
+            <div class="activity-item">
+              <span class="activity-dot bg-warning"></span>
+              <div>
+                <p class="mb-1 fw-semibold">Assign guarantor</p>
+                <p class="text-muted small mb-0">Pick an existing guarantor or create a new one.</p>
+              </div>
+            </div>
+            <div class="activity-item">
+              <span class="activity-dot bg-info"></span>
+              <div>
+                <p class="mb-1 fw-semibold">Upload collateral</p>
+                <p class="text-muted small mb-0">Attach photos or videos of the pledged asset.</p>
+              </div>
+            </div>
+            <div class="activity-item">
+              <span class="activity-dot bg-secondary"></span>
+              <div>
+                <p class="mb-1 fw-semibold">Review & submit</p>
+                <p class="text-muted small mb-0">Verify auto-calculated amounts before saving.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Loan term (months) by loan type
+    const loanTerms = {
+      personal:  12,
+      business:  24,
+      auto:      36,
+      mortgage:  60,
+      education: 24,
+      emergency: 6
+    };
+
+    // Tiered interest rates based on principal amount (Ksh)
+    const interestTiers = [
+      { max: 10000,   rate: 12.0 },
+      { max: 50000,   rate: 10.0 },
+      { max: 200000,  rate: 8.0  },
+      { max: Infinity, rate: 6.0 }
+    ];
+
+    const issueDate   = document.getElementById('issueDate');
+    const loanType    = document.getElementById('loanType');
+    const principal   = document.getElementById('principal');
+    const interestRate= document.getElementById('interestRate');
+    const totalDue    = document.getElementById('totalDue');
+    const dueDate     = document.getElementById('dueDate');
+
+    // Set today's date as default for issue date
+    if (issueDate && !issueDate.value) {
+      issueDate.value = new Date().toISOString().split('T')[0];
+    }
+
+    function getInterestRate(amount) {
+      for (let tier of interestTiers) {
+        if (amount <= tier.max) return tier.rate;
+      }
+      return interestTiers[interestTiers.length - 1].rate;
+    }
+
+    function calculateLoan() {
+      const type = loanType.value;
+      const term = loanTerms[type];
+      const amount = parseFloat(principal.value) || 0;
+
+      if (term && amount > 0) {
+        // Interest rate based on amount
+        const rate = getInterestRate(amount);
+        interestRate.value = rate.toFixed(2) + '%';
+
+        // Total due = principal + (principal * rate/100)
+        const interest = amount * (rate / 100);
+        const total = amount + interest;
+        totalDue.value = total.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        // Due date = issue date + term (months)
+        if (issueDate.value) {
+          const d = new Date(issueDate.value);
+          d.setMonth(d.getMonth() + term);
+          dueDate.value = d.toISOString().split('T')[0];
+        }
+      } else {
+        interestRate.value = '';
+        totalDue.value = '';
+        dueDate.value = '';
+      }
+    }
+
+    // Recalculate when loan type, principal, or issue date changes
+    loanType.addEventListener('change', calculateLoan);
+    principal.addEventListener('input', calculateLoan);
+    issueDate.addEventListener('change', calculateLoan);
+
+    // Initial calculation if values are pre-filled
+    calculateLoan();
+
+    // Bootstrap validation
+    document.querySelectorAll('.needs-validation').forEach(function (form) {
+      form.addEventListener('submit', function (event) {
+        if (!form.checkValidity()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+      }, false);
+    });
+
+    // Collateral preview
+    const collateralInput = document.getElementById('collateral');
+    const collateralPreview = document.getElementById('collateralPreview');
+
+    if (collateralInput && collateralPreview) {
+      collateralInput.addEventListener('change', function () {
+        collateralPreview.innerHTML = '';
+        Array.from(this.files).forEach(function (file) {
+          const url = URL.createObjectURL(file);
+          let html = '';
+          if (file.type.startsWith('image/')) {
+            html = '<img src="' + url + '" class="img-thumbnail" style="max-height:100px" alt="Collateral preview">';
+          } else if (file.type.startsWith('video/')) {
+            html = '<video src="' + url + '" class="img-thumbnail" style="max-height:100px" controls></video>';
+          }
+          if (html) collateralPreview.insertAdjacentHTML('beforeend', html);
+        });
+      });
+    }
+  });
+</script>
+
+
+      <footer class="admin-footer">
+        <div class="container-fluid px-3 px-lg-4">
+          <span>Copyright 2026 Jolly Micro Loans. <br>   </span>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="../assets/js/bootstrap.bundle.min.js"></script>
+  <script src="../assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="adminHMD professional admin dashboard template">
+  <title>Loan View | Jolly Micro Loans</title>
+
+  <link rel="stylesheet" href="../assets/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/vendors/bootstrap-icons/bootstrap-icons.css">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+
+<body>
+  <div class="admin-shell">
+    <div class="sidebar-backdrop" data-sidebar-close></div>
+
+    <aside class="admin-sidebar" id="adminSidebar" aria-label="Main navigation">
+      <div class="sidebar-header">
+        <a class="brand-mark" href="index.html" aria-label="adminHMD dashboard">
+          <span class="brand-icon"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i></span>
+          <span class="brand-copy">
+            <span class="brand-title">Jolly Micro Loans</span>
+            <span class="brand-subtitle">Admin </span>
+          </span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-link " href="index.html" aria-current="page">
+          <span class="nav-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a class="nav-link " href="clients.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Clients</span>
+        </a>
+
+        <a class="nav-link" href="guarantors.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Guarantors</span>
+        </a>
+
+        <a class="nav-link active" href="loans.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Loans</span>
+        </a>
+
+        <a class="nav-link " href="payments.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Payments</span>
+        </a>
+
+        <a class="nav-link" href="reports.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Reports</span>
+        </a>
+
+        
+      </nav>
+
+      <div class="sidebar-user">
+        <img class="avatar-img avatar-md sidebar-user-avatar" src="../assets/images/avatar/avatar.jpg" alt="Elizabeth Kamau">
+        <strong>Elizabeth Wangui</strong>
+        <small>Active Workspace</small>
+      </div>
+
+      <div class="sidebar-footer">
+        <span class="status-dot"></span>
+        <span class="sidebar-footer-text">System running smoothly</span>
+      </div>
+    </aside>
+
+    <div class="admin-main">
+
+      <nav class="navbar admin-navbar navbar-expand bg-white">
+        <div class="container-fluid px-3 px-lg-4">
+          <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-controls="adminSidebar" aria-expanded="true" aria-label="Toggle sidebar">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+
+          <form class="d-none d-md-flex ms-3 flex-grow-1" role="search">
+            <input class="form-control search-input" type="search" placeholder="Search users, orders, reports" aria-label="Search">
+          </form>
+
+          <div class="navbar-actions ms-auto">
+            <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme" title="Switch color theme">
+              <i class="bi bi-moon-stars" data-theme-icon aria-hidden="true"></i>
+            </button>
+            <div class="dropdown">
+              <button class="icon-button" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
+                <span class="notification-dot"></span>
+                <i class="bi bi-bell" aria-hidden="true"></i>
+              </button>
+              <div class="dropdown-menu dropdown-menu-end notification-menu">
+                <div class="dropdown-header fw-bold text-body">Notifications</div>
+                <a class="dropdown-item" href="users.html">
+                  <span class="notification-title">New user registered</span>
+                  <span class="notification-time">4 minutes ago</span>
+                </a>
+                <a class="dropdown-item" href="charts.html">
+                  <span class="notification-title">Revenue target reached</span>
+                  <span class="notification-time">32 minutes ago</span>
+                </a>
+                <a class="dropdown-item" href="settings.html">
+                  <span class="notification-title">Security review completed</span>
+                  <span class="notification-time">1 hour ago</span>
+                </a>
+              </div>
+            </div>
+
+            <div class="dropdown">
+              <button class="profile-button dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <img class="avatar-img avatar-sm" src="../assets/images/avatar/avatar.jpg" alt="Elizabeth Wangui">
+                <span class="profile-name d-none d-sm-inline">Elizabeth Wangui</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="profile.html">Profile</a></li>
+                <li><a class="dropdown-item" href="settings.html">Account settings</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="login.html">Sign out</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      
+
+      <main class="dashboard-content">
+  <div class="container-fluid px-3 px-lg-4 py-4">
+    <div class="page-heading">
+      <div class="page-heading-copy">
+        <span class="page-icon"><i class="bi bi-cash-coin" aria-hidden="true"></i></span>
+        <div>
+          <p class="eyebrow mb-1">Loan Management</p>
+          <h1 class="h3 mb-1">Loan Details</h1>
+          <p class="text-muted mb-0">View loan terms, client information, guarantor, collateral, and payment history.</p>
+        </div>
+      </div>
+      <div class="heading-actions">
+        <a class="btn btn-outline-secondary btn-sm" href="loans.html">
+          <i class="bi bi-arrow-left" aria-hidden="true"></i> Back
+        </a>
+        <a class="btn btn-primary btn-sm" href="loan-registration.html">
+          <i class="bi bi-plus-circle" aria-hidden="true"></i> Add Loan
+        </a>
+      </div>
+    </div>
+
+    <section class="row g-3">
+      <!-- Left column: Client profile -->
+      <div class="col-12 col-xl-4">
+        <div class="panel h-100 text-center profile-card">
+          <div class="profile-cover">
+            <img src="../assets/images/png/dasher-ui-bootstrap-5.jpg" alt="Client cover">
+          </div>
+          <div class="profile-hero">
+            <img class="avatar-img avatar-xl profile-photo" src="../assets/images/avatar/avatar-1.jpg" alt="Rafi Khan">
+            <h2 class="h5 mb-1">Rafi Khan</h2>
+            <p class="text-muted mb-3">Loan Client</p>
+            <span class="badge text-bg-success">Active</span>
+          </div>
+          <div class="info-list mt-4 text-start">
+            <div><span>Email</span><strong>rafi@example.com</strong></div>
+            <div><span>Phone</span><strong>0711100222</strong></div>
+            <div><span>ID No</span><strong>40023200</strong></div>
+            <div><span>Date of Birth</span><strong>Jan 15, 1990</strong></div>
+            <div><span>Location</span><strong>Nairobi, Kenya</strong></div>
+            <div><span>Member Since</span><strong>Jan 12, 2026</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column: Loan details + Payments table -->
+      <div class="col-12 col-xl-8">
+        <!-- Loan Details Panel -->
+        <div class="panel mb-3">
+          <div class="panel-header">
+            <div>
+              <h2 class="h5 mb-1 section-title">
+                <i class="bi bi-cash-coin" aria-hidden="true"></i>
+                <span>Loan Details</span>
+              </h2>
+              <p class="text-muted mb-0">Loan ID: #1001</p>
+            </div>
+            <button class="btn btn-primary btn-sm" type="button">Edit Loan</button>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="mini-card"><span>Loan Type</span><strong>Personal Loan</strong></div>
+            </div>
+            <div class="col-md-6">
+              <div class="mini-card"><span>Principal Amount</span><strong>Ksh 50,000</strong></div>
+            </div>
+            <div class="col-md-6">
+              <div class="mini-card"><span>Interest Rate</span><strong>10.0%</strong></div>
+            </div>
+            <div class="col-md-6">
+              <div class="mini-card"><span>Total Due</span><strong>Ksh 55,000</strong></div>
+            </div>
+            <div class="col-md-6">
+              <div class="mini-card"><span>Date of Issue</span><strong>Feb 03, 2026</strong></div>
+            </div>
+            <div class="col-md-6">
+              <div class="mini-card"><span>Due Date</span><strong>Feb 03, 2027</strong></div>
+            </div>
+            <div class="col-md-6">
+              <div class="mini-card">
+                <span>Status</span>
+                <strong><span class="badge text-bg-success">Active</span></strong>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mini-card"><span>Guarantor</span><strong>Sarah Ahmed (#001)</strong></div>
+            </div>
+            <div class="col-12">
+              <div class="mini-card">
+                <span>Collateral</span>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                  <img src="../assets/images/png/dasher-ui-bootstrap-5.jpg" class="img-thumbnail" style="max-height:100px" alt="Collateral">
+                  <img src="../assets/images/png/dasher-ui-bootstrap-5.jpg" class="img-thumbnail" style="max-height:100px" alt="Collateral">
+                </div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="mini-card">
+                <span>Notes</span>
+                <p class="mb-0 mt-1">Client requested early repayment option. Collateral verified.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payments Panel (unchanged) -->
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="h5 mb-1 section-title">
+                <i class="bi bi-clock-history" aria-hidden="true"></i>
+                <span>Payments</span>
+              </h2>
+              <p class="text-muted mb-0">Latest security and workflow events.</p>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Payment Id</th>
+                  <th scope="col">Client</th>
+                  <th scope="col">Loan Id</th>
+                  <th scope="col">Amount Paid</th>
+                  <th scope="col">Date Paid</th>
+                  <th scope="col">Mode of payment</th>
+                  <th scope="col" class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>#1001</td>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <img class="avatar-img avatar-sm" src="../assets/images/avatar/avatar-1.jpg" alt="Sarah Ahmed">
+                      <div>
+                        <p class="fw-semibold mb-0">Rafi Khan</p>
+                        <p class="text-muted small mb-0">rafi@example.com</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td>#1002</td>
+                  <td>Ksh 10000</td>
+                  <td>Feb 03, 2026</td>
+                  <td><span class="badge text-bg-danger">Mpesa</span></td>
+                  <td class="text-end"><a class="btn btn-light btn-sm" href="user-details.html">View</a></td>
+                </tr>
+                <tr>
+                  <td>#1001</td>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <img class="avatar-img avatar-sm" src="../assets/images/avatar/avatar-1.jpg" alt="Sarah Ahmed">
+                      <div>
+                        <p class="fw-semibold mb-0">Rafi Khan</p>
+                        <p class="text-muted small mb-0">rafi@example.com</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td>#1002</td>
+                  <td>Ksh 10000</td>
+                  <td>Feb 03, 2026</td>
+                  <td><span class="badge text-bg-danger">Mpesa</span></td>
+                  <td class="text-end"><a class="btn btn-light btn-sm" href="user-details.html">View</a></td>
+                </tr>
+                <tr>
+                  <td>#1001</td>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <img class="avatar-img avatar-sm" src="../assets/images/avatar/avatar-1.jpg" alt="Sarah Ahmed">
+                      <div>
+                        <p class="fw-semibold mb-0">Rafi Khan</p>
+                        <p class="text-muted small mb-0">rafi@example.com</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td>#1002</td>
+                  <td>Ksh 10000</td>
+                  <td>Feb 03, 2026</td>
+                  <td><span class="badge text-bg-danger">Mpesa</span></td>
+                  <td class="text-end"><a class="btn btn-light btn-sm" href="user-details.html">View</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+      <footer class="admin-footer">
+        <div class="container-fluid px-3 px-lg-4">
+          <span>Copyright 2026 Jolly Micro Loans. <br>   </span>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="../assets/js/bootstrap.bundle.min.js"></script>
+  <script src="../assets/js/main.js"></script>
+</body>
+</html>

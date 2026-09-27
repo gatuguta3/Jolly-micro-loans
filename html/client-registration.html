@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="adminHMD professional admin dashboard template">
+  <title>Reports | Jolly Micro Loans</title>
+
+  <link rel="stylesheet" href="../assets/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/vendors/bootstrap-icons/bootstrap-icons.css">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+
+<body>
+  <div class="admin-shell">
+    <div class="sidebar-backdrop" data-sidebar-close></div>
+
+    <aside class="admin-sidebar" id="adminSidebar" aria-label="Main navigation">
+      <div class="sidebar-header">
+        <a class="brand-mark" href="index.html" aria-label="adminHMD dashboard">
+          <span class="brand-icon"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i></span>
+          <span class="brand-copy">
+            <span class="brand-title">Jolly Micro Loans</span>
+            <span class="brand-subtitle">Admin </span>
+          </span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-link " href="index.html" aria-current="page">
+          <span class="nav-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a class="nav-link active" href="clients.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Clients</span>
+        </a>
+
+        <a class="nav-link" href="guarantors.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Guarantors</span>
+        </a>
+
+        <a class="nav-link" href="loans.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Loans</span>
+        </a>
+
+        <a class="nav-link" href="payments.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Payments</span>
+        </a>
+
+        <a class="nav-link" href="reports.html">
+          <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+          <span class="nav-text">Reports</span>
+        </a>
+
+        
+      </nav>
+
+      <div class="sidebar-user">
+        <img class="avatar-img avatar-md sidebar-user-avatar" src="../assets/images/avatar/avatar.jpg" alt="Elizabeth Kamau">
+        <strong>Elizabeth Wangui</strong>
+        <small>Active Workspace</small>
+      </div>
+
+      <div class="sidebar-footer">
+        <span class="status-dot"></span>
+        <span class="sidebar-footer-text">System running smoothly</span>
+      </div>
+    </aside>
+
+    <div class="admin-main">
+
+      <nav class="navbar admin-navbar navbar-expand bg-white">
+        <div class="container-fluid px-3 px-lg-4">
+          <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-controls="adminSidebar" aria-expanded="true" aria-label="Toggle sidebar">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+
+          <form class="d-none d-md-flex ms-3 flex-grow-1" role="search">
+            <input class="form-control search-input" type="search" placeholder="Search users, orders, reports" aria-label="Search">
+          </form>
+
+          <div class="navbar-actions ms-auto">
+            <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme" title="Switch color theme">
+              <i class="bi bi-moon-stars" data-theme-icon aria-hidden="true"></i>
+            </button>
+            <div class="dropdown">
+              <button class="icon-button" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
+                <span class="notification-dot"></span>
+                <i class="bi bi-bell" aria-hidden="true"></i>
+              </button>
+              <div class="dropdown-menu dropdown-menu-end notification-menu">
+                <div class="dropdown-header fw-bold text-body">Notifications</div>
+                <a class="dropdown-item" href="users.html">
+                  <span class="notification-title">New user registered</span>
+                  <span class="notification-time">4 minutes ago</span>
+                </a>
+                <a class="dropdown-item" href="charts.html">
+                  <span class="notification-title">Revenue target reached</span>
+                  <span class="notification-time">32 minutes ago</span>
+                </a>
+                <a class="dropdown-item" href="settings.html">
+                  <span class="notification-title">Security review completed</span>
+                  <span class="notification-time">1 hour ago</span>
+                </a>
+              </div>
+            </div>
+
+            <div class="dropdown">
+              <button class="profile-button dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <img class="avatar-img avatar-sm" src="../assets/images/avatar/avatar.jpg" alt="Elizabeth Wangui">
+                <span class="profile-name d-none d-sm-inline">Elizabeth Wangui</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="profile.html">Profile</a></li>
+                <li><a class="dropdown-item" href="settings.html">Account settings</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="login.html">Sign out</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      
+
+      <main class="dashboard-content">
+  <div class="container-fluid px-3 px-lg-4 py-4">
+    <div class="page-heading">
+      <div class="page-heading-copy">
+        <span class="page-icon"><i class="bi bi-person-plus" aria-hidden="true"></i></span>
+        <div>
+          <p class="eyebrow mb-1">Management</p>
+          <h1 class="h3 mb-1">Add Client</h1>
+          <p class="text-muted mb-0">Create a new client and access them on your loan dashboard.</p>
+        </div>
+      </div>
+      <div class="heading-actions">
+        <a class="btn btn-outline-secondary btn-sm" href="clients.html">
+          <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to clients
+        </a>
+      </div>
+    </div>
+
+    <section class="row g-3">
+      <!-- Left column: form -->
+      <div class="col-12 col-xl-8">
+        <form class="panel needs-validation" method="post" enctype="multipart/form-data" novalidate>
+          <div class="panel-header">
+            <div>
+              <h2 class="h5 mb-1 section-title">
+                <i class="bi bi-person-plus" aria-hidden="true"></i>
+                <span>Client Information</span>
+              </h2>
+              <p class="text-muted mb-0">Create a client account with validated fields.</p>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="firstName">First name</label>
+              <input class="form-control" id="firstName" name="firstName" type="text" required>
+              <div class="invalid-feedback">First name is required.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="lastName">Last name</label>
+              <input class="form-control" id="lastName" name="lastName" type="text" required>
+              <div class="invalid-feedback">Last name is required.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="email">Email</label>
+              <input class="form-control" id="email" name="email" type="email" required>
+              <div class="invalid-feedback">Enter a valid email.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="phone">Phone</label>
+              <input class="form-control" id="phone" name="phone" type="tel" required>
+              <div class="invalid-feedback">Phone number is required.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="idNo">ID No</label>
+              <input class="form-control" id="idNo" name="idNo" type="text" required>
+              <div class="invalid-feedback">ID number is required.</div>
+            </div>
+
+            <!-- Datepicker -->
+            <div class="col-md-6">
+              <label class="form-label" for="dob">Date of birth</label>
+              <input class="form-control" id="dob" name="dob" type="date" required>
+              <div class="invalid-feedback">Date of birth is required.</div>
+            </div>
+
+            <!-- Media upload -->
+            <div class="col-12">
+              <label class="form-label" for="media">Media upload</label>
+              <input class="form-control" id="media" name="media[]" type="file" accept="image/*,video/*" multiple>
+              <div class="form-text">Upload profile image or video. Accepted: JPG, PNG, GIF, MP4.</div>
+              <div id="mediaPreview" class="mt-2 d-flex flex-wrap"></div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="notes">Notes</label>
+              <textarea class="form-control" id="notes" name="notes" rows="4" placeholder="Optional onboarding notes"></textarea>
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+            <a class="btn btn-outline-secondary" href="clients.html">Cancel</a>
+            <button class="btn btn-primary" type="submit">
+              <i class="bi bi-person-check" aria-hidden="true"></i> Create Client
+            </button>
+          </div>
+        </form>
+
+        <script>
+          (() => {
+            // Bootstrap validation
+            document.querySelectorAll('.needs-validation').forEach(form => {
+              form.addEventListener('submit', event => {
+                if (!form.checkValidity()) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+              }, false);
+            });
+
+            // Media preview
+            const mediaInput = document.getElementById('media');
+            const preview = document.getElementById('mediaPreview');
+
+            if (mediaInput && preview) {
+              mediaInput.addEventListener('change', () => {
+                preview.innerHTML = '';
+
+                Array.from(mediaInput.files).forEach(file => {
+                  const url = URL.createObjectURL(file);
+                  const html = file.type.startsWith('image/')
+                    ? `<img src="${url}" class="img-thumbnail me-2 mb-2" style="max-height:120px" alt="Preview">`
+                    : `<video src="${url}" class="img-thumbnail me-2 mb-2" style="max-height:120px" controls></video>`;
+
+                  preview.insertAdjacentHTML('beforeend', html);
+                });
+              });
+            }
+          })();
+        </script>
+      </div>
+
+      <!-- Right column: Client checklist -->
+      <div class="col-12 col-xl-4">
+        <div class="panel h-100">
+          <h2 class="h5 mb-3 section-title">
+            <i class="bi bi-list-check" aria-hidden="true"></i>
+            <span>Client Checklist</span>
+          </h2>
+          <div class="activity-list">
+            <div class="activity-item">
+              <span class="activity-dot bg-primary"></span>
+              <div>
+                <p class="mb-1 fw-semibold">Verify personal details</p>
+                <p class="text-muted small mb-0">Confirm first name, last name, and date of birth.</p>
+              </div>
+            </div>
+            <div class="activity-item">
+              <span class="activity-dot bg-success"></span>
+              <div>
+                <p class="mb-1 fw-semibold">Confirm contact information</p>
+                <p class="text-muted small mb-0">Ensure email and phone number are correct and reachable.</p>
+              </div>
+            </div>
+            <div class="activity-item">
+              <span class="activity-dot bg-warning"></span>
+              <div>
+                <p class="mb-1 fw-semibold">Validate ID number</p>
+                <p class="text-muted small mb-0">Check the ID number against official documents.</p>
+              </div>
+            </div>
+            <div class="activity-item">
+              <span class="activity-dot bg-info"></span>
+              <div>
+                <p class="mb-1 fw-semibold">Upload profile photo</p>
+                <p class="text-muted small mb-0">A clear photo helps identify the client.</p>
+              </div>
+            </div>
+            <div class="activity-item">
+              <span class="activity-dot bg-secondary"></span>
+              <div>
+                <p class="mb-1 fw-semibold">Save client record</p>
+                <p class="text-muted small mb-0">The client will appear in the clients list and loan dashboard.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+
+      <footer class="admin-footer">
+        <div class="container-fluid px-3 px-lg-4">
+          <span>Copyright 2026 Jolly Micro Loans. <br>   </span>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="../assets/js/bootstrap.bundle.min.js"></script>
+  <script src="../assets/js/main.js"></script>
+</body>
+</html>
