@@ -56,7 +56,7 @@ if (!$loan) {
 }
 
 /* ----------------------------------------------------------------
-   FETCH GUARANTOR (defensive — table may not exist yet)
+   FETCH GUARANTORS (via join table, if it exists)
 ---------------------------------------------------------------- */
 $guarantors = [];
 $tableCheck = $conn->query("SHOW TABLES LIKE 'loan_guarantors'");
@@ -69,10 +69,33 @@ if ($tableCheck && $tableCheck->num_rows > 0) {
          INNER JOIN guarantors g ON g.id = lg.guarantor_id
          WHERE lg.loan_id = ?"
     );
+    if ($stmt) {
+        $stmt->bind_param("i", $loanId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        while ($r = $res->fetch_assoc()) $guarantors[] = $r;
+        $stmt->close();
+    }
+}
+
+/* ----------------------------------------------------------------
+   FETCH PAYMENTS FOR THIS LOAN
+---------------------------------------------------------------- */
+$payments = [];
+$stmt = $conn->prepare(
+    "SELECT
+        p.id, p.payment_code, p.amount_paid, p.payment_date,
+        p.mode_of_payment, p.reference_number, p.remarks, p.upload,
+        p.recorded_at
+     FROM payments p
+     WHERE p.loan_id = ?
+     ORDER BY p.payment_date DESC, p.id DESC"
+);
+if ($stmt) {
     $stmt->bind_param("i", $loanId);
     $stmt->execute();
     $res = $stmt->get_result();
-    while ($r = $res->fetch_assoc()) $guarantors[] = $r;
+    while ($r = $res->fetch_assoc()) $payments[] = $r;
     $stmt->close();
 }
 
@@ -101,22 +124,43 @@ if (!function_exists('lv_avatar_svg')) {
     }
 }
 
-function lv_status_badge(string $status): array {
-    return match ($status) {
-        'active'      => ['text-bg-success',   'Active'],
-        'defaulted'   => ['text-bg-danger',    'Defaulted'],
-        'cleared'     => ['text-bg-primary',   'Cleared'],
-        'written_off' => ['text-bg-secondary', 'Written Off'],
-        default       => ['text-bg-secondary', ucfirst($status)],
-    };
+if (!function_exists('lv_status_badge')) {
+    function lv_status_badge(string $status): array {
+        return match ($status) {
+            'active'      => ['text-bg-success',   'Active'],
+            'overdue'     => ['text-bg-warning',   'Overdue'],
+            'defaulted'   => ['text-bg-danger',    'Defaulted'],
+            'cleared'     => ['text-bg-primary',   'Cleared'],
+            'written_off' => ['text-bg-secondary', 'Written Off'],
+            default       => ['text-bg-secondary', ucfirst($status)],
+        };
+    }
 }
 
-function lv_ksh($n): string {
-    return 'Ksh ' . number_format((float) $n, 2);
+if (!function_exists('lv_payment_mode_badge')) {
+    function lv_payment_mode_badge(string $mode): array {
+        return match ($mode) {
+            'mpesa'          => ['text-bg-danger',   'Mpesa'],
+            'cash'           => ['text-bg-success',  'Cash'],
+            'bank_transfer'  => ['text-bg-primary',  'Bank Transfer'],
+            'cheque'         => ['text-bg-warning',  'Cheque'],
+            'card'           => ['text-bg-info',     'Card'],
+            'other'          => ['text-bg-secondary','Other'],
+            default          => ['text-bg-secondary', ucfirst($mode)],
+        };
+    }
 }
 
-function lv_fmt_date(?string $d): string {
-    return $d ? date('M j, Y', strtotime($d)) : '—';
+if (!function_exists('lv_ksh')) {
+    function lv_ksh($n): string {
+        return 'Ksh ' . number_format((float) $n, 2);
+    }
+}
+
+if (!function_exists('lv_fmt_date')) {
+    function lv_fmt_date(?string $d): string {
+        return $d ? date('M j, Y', strtotime($d)) : '—';
+    }
 }
 
 /* ---------- Prepare display values ---------- */
@@ -126,7 +170,8 @@ $clientPhoto = !empty($loan['client_photo'])
     ? '../assets/client-attachments/' . rawurlencode($loan['client_photo'])
     : lv_avatar_svg($loan['client_name']);
 
-$loanPurpose = $loan['purpose'] ?: ucwords(str_replace('_', ' ', 'personal')) . ' Loan';
+$totalPaid = 0.0;
+foreach ($payments as $p) $totalPaid += (float) $p['amount_paid'];
 
 ob_start();
 ?>
@@ -336,7 +381,7 @@ ob_start();
       </div>
     </div>
 
-    <!-- Payments Panel (header only — no payments table yet) -->
+    <!-- Payments Panel -->
     <div class="panel">
       <div class="panel-header">
         <div>
@@ -344,12 +389,26 @@ ob_start();
             <i class="bi bi-clock-history" aria-hidden="true"></i>
             <span>Payments</span>
           </h2>
-          <p class="text-muted mb-0">Payment history for this loan.</p>
+          <p class="text-muted mb-0">
+            <?php if (empty($payments)): ?>
+              Payment history for this loan.
+            <?php else: ?>
+              <?= count($payments) ?> payment<?= count($payments) === 1 ? '' : 's' ?> · <?= lv_ksh($totalPaid) ?> total
+            <?php endif; ?>
+          </p>
         </div>
-        <button class="btn btn-primary btn-sm" type="button" disabled>
-          <i class="bi bi-plus-circle" aria-hidden="true"></i> Record Payment
-        </button>
+        <?php if ($loan['status'] !== 'cleared' && $loan['status'] !== 'written_off'): ?>
+          <a class="btn btn-primary btn-sm"
+             href="payment-registration.php?loan_id=<?= (int) $loan['id'] ?>">
+            <i class="bi bi-plus-circle" aria-hidden="true"></i> Record Payment
+          </a>
+        <?php else: ?>
+          <button class="btn btn-primary btn-sm" type="button" disabled>
+            <i class="bi bi-plus-circle" aria-hidden="true"></i> Record Payment
+          </button>
+        <?php endif; ?>
       </div>
+
       <div class="table-responsive">
         <table class="table align-middle mb-0">
           <thead>
@@ -364,11 +423,49 @@ ob_start();
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td colspan="7" class="text-center text-muted py-4">
-                No payments recorded for this loan yet.
-              </td>
-            </tr>
+
+            <?php if (empty($payments)): ?>
+              <tr>
+                <td colspan="7" class="text-center text-muted py-4">
+                  No payments recorded for this loan yet.
+                </td>
+              </tr>
+            <?php else: ?>
+              <?php foreach ($payments as $p): ?>
+                <?php
+                  [$modeClass, $modeLabel] = lv_payment_mode_badge($p['mode_of_payment']);
+                  $paidFmt = $p['payment_date'] ? date('M j, Y', strtotime($p['payment_date'])) : '—';
+                ?>
+                <tr>
+                  <td>
+                    <span class="fw-semibold"><?= htmlspecialchars($p['payment_code'], ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php if (!empty($p['reference_number'])): ?>
+                      <p class="text-muted small mb-0"><?= htmlspecialchars($p['reference_number'], ENT_QUOTES, 'UTF-8') ?></p>
+                    <?php endif; ?>
+                  </td>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <img class="avatar-img avatar-sm"
+                           src="<?= htmlspecialchars($clientPhoto, ENT_QUOTES, 'UTF-8') ?>"
+                           alt="<?= htmlspecialchars($loan['client_name'], ENT_QUOTES, 'UTF-8') ?>">
+                      <div>
+                        <p class="fw-semibold mb-0"><?= htmlspecialchars($loan['client_name'], ENT_QUOTES, 'UTF-8') ?></p>
+                        <p class="text-muted small mb-0"><?= htmlspecialchars($loan['client_email'] ?? '—', ENT_QUOTES, 'UTF-8') ?></p>
+                      </div>
+                    </div>
+                  </td>
+                  <td><?= htmlspecialchars($loan['loan_code'], ENT_QUOTES, 'UTF-8') ?></td>
+                  <td><?= lv_ksh($p['amount_paid']) ?></td>
+                  <td><?= htmlspecialchars($paidFmt) ?></td>
+                  <td><span class="badge <?= $modeClass ?>"><?= htmlspecialchars($modeLabel) ?></span></td>
+                  <td class="text-end">
+                    <a class="btn btn-light btn-sm"
+                       href="payment-view.php?id=<?= (int) $p['id'] ?>">View</a>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            <?php endif; ?>
+
           </tbody>
         </table>
       </div>

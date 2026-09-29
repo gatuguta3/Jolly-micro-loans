@@ -14,13 +14,14 @@ if (session_status() === PHP_SESSION_NONE) {
    UPLOAD CONFIG
    assets/ is one level up from admin/
 ---------------------------------------------------------------- */
-$uploadDirFs = __DIR__ . '/../assets/images/guarantor-attachments/';
+$uploadDirFs = __DIR__ . '/assets/images/guarantor-attachments/';
 $maxBytes    = 5 * 1024 * 1024;   // 5 MB
 $allowedMime = [
     'image/jpeg' => 'jpg',
     'image/png'  => 'png',
     'image/webp' => 'webp',
     'image/gif'  => 'gif',
+    'application/pdf' => 'pdf',   // many IDs come as scans
 ];
 if (!is_dir($uploadDirFs)) {
     @mkdir($uploadDirFs, 0775, true);
@@ -28,24 +29,37 @@ if (!is_dir($uploadDirFs)) {
 
 /* ---------- HELPERS ---------- */
 function save_guarantor_photo(array $file, string $fsDir, array $allowedMime, int $maxBytes): array {
-    // returns [filename|null, error|null]
     if (!isset($file['error']) || $file['error'] === UPLOAD_ERR_NO_FILE) {
-        return [null, null];  // no upload, fine
+        return [null, null];  // no upload
     }
     if ($file['error'] !== UPLOAD_ERR_OK) {
         return [null, 'Upload failed (code ' . $file['error'] . ').'];
     }
     if ($file['size'] > $maxBytes) {
-        return [null, 'Photo exceeds 5 MB.'];
+        return [null, 'File exceeds 5 MB.'];
     }
 
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $mime  = $finfo->file($file['tmp_name']);
-    if (!isset($allowedMime[$mime])) {
-        return [null, 'Unsupported image type: ' . htmlspecialchars($mime)];
+    // Detect MIME with fileinfo, fall back to extension if unavailable
+    $mime = null;
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime  = $finfo->file($file['tmp_name']);
+    }
+    if (!$mime || !isset($allowedMime[$mime])) {
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $fallback = ['jpg'=>'jpg','jpeg'=>'jpg','png'=>'png','webp'=>'webp','gif'=>'gif','pdf'=>'pdf'];
+        if (!isset($fallback[$ext])) {
+            return [null, 'Unsupported file type.'];
+        }
+        $ext = $fallback[$ext];
+    } else {
+        $ext = $allowedMime[$mime];
     }
 
-    $ext  = $allowedMime[$mime];
+    if (!is_writable($fsDir)) {
+        return [null, 'Upload folder is not writable.'];
+    }
+
     $name = date('Ymd_His') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
     $dest = rtrim($fsDir, '/\\') . DIRECTORY_SEPARATOR . $name;
 
@@ -62,11 +76,16 @@ $errors = [];
 $form = [
     'dateCreated'   => date('Y-m-d'),
     'guarantorName' => '',
+    'type'          => 'individual',    // 'individual' | 'chama'
+    'idType'        => 'id_no',         // 'id_no' | 'passport' | 'other'
     'email'         => '',
     'idNo'          => '',
     'phone'         => '',
     'notes'         => '',
 ];
+
+$validTypes    = ['individual', 'chama'];
+$validIdTypes  = ['id_no', 'passport', 'other'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
@@ -78,9 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($form['guarantorName'] === '') {
         $errors[] = 'Guarantor name is required.';
     }
-    if ($form['email'] === '') {
-        $errors[] = 'Email is required.';
-    } elseif (!filter_var($form['email'], FILTER_VALIDATE_EMAIL)) {
+    if ($form['email'] !== '' && !filter_var($form['email'], FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Enter a valid email.';
     }
     if ($form['idNo'] === '') {
@@ -92,6 +109,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($form['dateCreated'] === '' ||
         !preg_match('/^\d{4}-\d{2}-\d{2}$/', $form['dateCreated'])) {
         $errors[] = 'Date created is invalid.';
+    }
+    if (!in_array($form['type'], $validTypes, true)) {
+        $form['type'] = 'individual';
+    }
+    if (!in_array($form['idType'], $validIdTypes, true)) {
+        $form['idType'] = 'id_no';
     }
 
     /* ---- Duplicate ID check ---- */
@@ -117,34 +140,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         else      $photoFile = $fname;
     }
 
-    /* ---- Insert ---- */
+    /* ---- Insert (no `created_by` in this table) ---- */
     if (empty($errors)) {
-        $notes     = $form['notes'] !== '' ? $form['notes'] : null;
-        $createdBy = $_SESSION['user_id'] ?? null;
+        $email = $form['email'] !== '' ? $form['email'] : null;
+        $notes = $form['notes'] !== '' ? $form['notes'] : null;
 
         $sql = "INSERT INTO guarantors
                 (name, email, phone,
                  type, identification_type, identification_number,
-                 attachment_url, notes, date_added, created_by)
+                 attachment_url, notes, date_added)
                 VALUES (?, ?, ?,
-                        'individual', 'id_no', ?,
-                        ?, ?, ?, ?)";
+                        ?, ?, ?,
+                        ?, ?, ?)";
 
         $stmt = $conn->prepare($sql);
         if (!$stmt) {
             $errors[] = 'Database error: ' . $conn->error;
         } else {
-            //   name, email, phone, idNo, photo, notes, dateCreated, createdBy
+            // name, email, phone, type, idType, idNo, photo, notes, dateCreated
             $stmt->bind_param(
-                "sssssssi",
+                "sssssssss",
                 $form['guarantorName'],
-                $form['email'],
+                $email,
                 $form['phone'],
+                $form['type'],
+                $form['idType'],
                 $form['idNo'],
                 $photoFile,
                 $notes,
-                $form['dateCreated'],
-                $createdBy
+                $form['dateCreated']
             );
 
             if ($stmt->execute()) {
@@ -155,8 +179,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             } else {
                 $errors[] = 'Could not save guarantor: ' . $stmt->error;
+                $stmt->close();
             }
-            $stmt->close();
         }
     }
 }
@@ -205,7 +229,7 @@ ob_start();
       </div>
 
       <div class="row g-3">
-        <!-- Guarantor ID (readonly, informational) -->
+        <!-- Guarantor ID (informational) -->
         <div class="col-md-6">
           <label class="form-label" for="guarantorId">Guarantor ID</label>
           <input class="form-control" id="guarantorId" name="guarantorId" type="text"
@@ -221,7 +245,7 @@ ob_start();
           <div class="invalid-feedback">Date created is required.</div>
         </div>
 
-        <!-- Full name -->
+        <!-- Guarantor Name -->
         <div class="col-md-6">
           <label class="form-label" for="guarantorName">Guarantor Name</label>
           <input class="form-control" id="guarantorName" name="guarantorName" type="text" required
@@ -229,20 +253,21 @@ ob_start();
           <div class="invalid-feedback">Guarantor name is required.</div>
         </div>
 
+        <!-- Type -->
+        <div class="col-md-6">
+          <label class="form-label" for="type">Guarantor Type</label>
+          <select class="form-select" id="type" name="type" required>
+            <option value="individual" <?= $form['type']==='individual' ? 'selected':'' ?>>Individual</option>
+            <option value="chama"      <?= $form['type']==='chama'      ? 'selected':'' ?>>Chama</option>
+          </select>
+        </div>
+
         <!-- Email -->
         <div class="col-md-6">
           <label class="form-label" for="email">Email</label>
-          <input class="form-control" id="email" name="email" type="email" required
+          <input class="form-control" id="email" name="email" type="email"
                  value="<?= htmlspecialchars($form['email'], ENT_QUOTES, 'UTF-8') ?>">
           <div class="invalid-feedback">Enter a valid email.</div>
-        </div>
-
-        <!-- ID Number -->
-        <div class="col-md-6">
-          <label class="form-label" for="idNo">ID No</label>
-          <input class="form-control" id="idNo" name="idNo" type="text" required
-                 value="<?= htmlspecialchars($form['idNo'], ENT_QUOTES, 'UTF-8') ?>">
-          <div class="invalid-feedback">ID number is required.</div>
         </div>
 
         <!-- Phone -->
@@ -253,12 +278,30 @@ ob_start();
           <div class="invalid-feedback">Phone number is required.</div>
         </div>
 
-        <!-- Photo upload -->
+        <!-- Identification type -->
+        <div class="col-md-6">
+          <label class="form-label" for="idType">Identification Type</label>
+          <select class="form-select" id="idType" name="idType" required>
+            <option value="id_no"    <?= $form['idType']==='id_no'    ? 'selected':'' ?>>ID No</option>
+            <option value="passport" <?= $form['idType']==='passport' ? 'selected':'' ?>>Passport</option>
+            <option value="other"    <?= $form['idType']==='other'    ? 'selected':'' ?>>Other Document</option>
+          </select>
+        </div>
+
+        <!-- ID Number -->
+        <div class="col-md-6">
+          <label class="form-label" for="idNo">ID Number</label>
+          <input class="form-control" id="idNo" name="idNo" type="text" required
+                 value="<?= htmlspecialchars($form['idNo'], ENT_QUOTES, 'UTF-8') ?>">
+          <div class="invalid-feedback">ID number is required.</div>
+        </div>
+
+        <!-- Photo / attachment -->
         <div class="col-12">
-          <label class="form-label" for="guarantorPhoto">Guarantor Photo</label>
+          <label class="form-label" for="guarantorPhoto">Guarantor Photo / ID Scan</label>
           <input class="form-control" id="guarantorPhoto" name="guarantorPhoto" type="file"
-                 accept="image/*">
-          <div class="form-text">Upload a clear passport-size photo (JPG or PNG).</div>
+                 accept="image/*,application/pdf">
+          <div class="form-text">JPG, PNG, WEBP, GIF or PDF. Max 5 MB.</div>
           <div id="photoPreview" class="mt-2"></div>
         </div>
 
@@ -286,34 +329,10 @@ ob_start();
         <span>Guarantor Checklist</span>
       </h2>
       <div class="activity-list">
-        <div class="activity-item">
-          <span class="activity-dot bg-primary"></span>
-          <div>
-            <p class="mb-1 fw-semibold">Verify ID number</p>
-            <p class="text-muted small mb-0">Confirm the ID matches the guarantor’s documents.</p>
-          </div>
-        </div>
-        <div class="activity-item">
-          <span class="activity-dot bg-success"></span>
-          <div>
-            <p class="mb-1 fw-semibold">Confirm phone number</p>
-            <p class="text-muted small mb-0">Ensure the phone number is active and reachable.</p>
-          </div>
-        </div>
-        <div class="activity-item">
-          <span class="activity-dot bg-warning"></span>
-          <div>
-            <p class="mb-1 fw-semibold">Attach photo</p>
-            <p class="text-muted small mb-0">A clear photo helps identify the guarantor.</p>
-          </div>
-        </div>
-        <div class="activity-item">
-          <span class="activity-dot bg-secondary"></span>
-          <div>
-            <p class="mb-1 fw-semibold">Save record</p>
-            <p class="text-muted small mb-0">The guarantor will appear in the guarantors table.</p>
-          </div>
-        </div>
+        <div class="activity-item"><span class="activity-dot bg-primary"></span><div><p class="mb-1 fw-semibold">Verify ID number</p><p class="text-muted small mb-0">Confirm the ID matches the guarantor’s documents.</p></div></div>
+        <div class="activity-item"><span class="activity-dot bg-success"></span><div><p class="mb-1 fw-semibold">Confirm phone number</p><p class="text-muted small mb-0">Ensure the phone number is active and reachable.</p></div></div>
+        <div class="activity-item"><span class="activity-dot bg-warning"></span><div><p class="mb-1 fw-semibold">Attach photo</p><p class="text-muted small mb-0">A clear photo helps identify the guarantor.</p></div></div>
+        <div class="activity-item"><span class="activity-dot bg-secondary"></span><div><p class="mb-1 fw-semibold">Save record</p><p class="text-muted small mb-0">The guarantor will appear in the guarantors table.</p></div></div>
       </div>
     </div>
   </div>
@@ -341,8 +360,10 @@ ob_start();
       const file = input.files[0];
       if (!file) return;
       const url = URL.createObjectURL(file);
-      preview.insertAdjacentHTML('beforeend',
-        `<img src="${url}" class="img-thumbnail" style="max-height:140px" alt="Preview">`);
+      const html = file.type.startsWith('image/')
+        ? `<img src="${url}" class="img-thumbnail" style="max-height:140px" alt="Preview">`
+        : `<span class="badge text-bg-secondary">${file.name}</span>`;
+      preview.insertAdjacentHTML('beforeend', html);
     });
   }
 })();

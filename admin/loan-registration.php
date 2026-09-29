@@ -11,48 +11,73 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /* ----------------------------------------------------------------
-   INTEREST TIERS & LOAN TERMS
-   Tiers (inclusive bounds):
-     5,000    – 100,000   → 20%
-     100,001  – 500,000   → 18%
-     500,001  – 1,000,000 → 15%
+   LOAN CATEGORIES
+   Monthly:  30-day term, tiered rate 20% / 18% / 15%
+   Daily:    1-day term,  flat 2.5% interest
+   Boost:    5-day term,  0% interest (Jolly Boost)
+
+   Status transitions (based on 3× term validity):
+     Monthly → overdue after 30 days, defaulted after 90 days
+     Daily   → overdue after 1 day,  defaulted after 3 days
+     Boost   → overdue after 5 days, defaulted after 15 days
 ---------------------------------------------------------------- */
+$loanCategories = [
+    'monthly' => [
+        'label'         => 'Monthly Loan',
+        'term_days'     => 30,
+        'rate_type'     => 'tiered',
+        'tiers'         => [
+            ['min' => 5000,   'max' => 100000,  'rate' => 20.00],
+            ['min' => 100001, 'max' => 500000,  'rate' => 18.00],
+            ['min' => 500001, 'max' => 1000000, 'rate' => 15.00],
+        ],
+        'default_mult'  => 3,   // 90 days to default
+    ],
+    'daily' => [
+        'label'         => 'Daily Loan',
+        'term_days'     => 1,
+        'rate_type'     => 'flat',
+        'rate'          => 2.50,
+        'default_mult'  => 3,   // 3 days to default
+    ],
+    'boost' => [
+        'label'         => 'Jolly Boost Loan',
+        'term_days'     => 5,
+        'rate_type'     => 'flat',
+        'rate'          => 0.00,
+        'default_mult'  => 3,   // 15 days to default
+    ],
+];
+
 $minPrincipal = 5000.00;
 $maxPrincipal = 1000000.00;
 
-$interestTiers = [
-    ['min' => 5000,   'max' => 100000,  'rate' => 20.00],
-    ['min' => 100001, 'max' => 500000,  'rate' => 18.00],
-    ['min' => 500001, 'max' => 1000000, 'rate' => 15.00],
-];
+/* ---------- RATE / TERM HELPERS ---------- */
+function calc_category_rate(string $category, float $principal, array $categories): ?float {
+    if (!isset($categories[$category])) return null;
+    $cfg = $categories[$category];
 
-$loanTerms = [
-    'personal'  => 30,
-    'business'  => 90,
-    'auto'      => 180,
-    'mortgage'  => 365,
-    'education' => 180,
-    'emergency' => 14,
-];
+    if ($cfg['rate_type'] === 'flat') {
+        return (float) $cfg['rate'];
+    }
 
-function calc_interest_rate(float $principal, array $tiers): ?float {
-    foreach ($tiers as $t) {
+    // tiered
+    foreach ($cfg['tiers'] as $t) {
         if ($principal >= $t['min'] && $principal <= $t['max']) {
             return (float) $t['rate'];
         }
     }
-    return null;   // out of range
+    return null;
 }
 
-function calc_due_date(string $issueDate, string $loanType, array $terms): string {
-    $days = $terms[$loanType] ?? 30;
+function calc_due_date(string $issueDate, int $termDays): string {
     $dt = new DateTime($issueDate);
-    $dt->modify("+{$days} days");
+    $dt->modify("+{$termDays} days");
     return $dt->format('Y-m-d');
 }
 
 /* ----------------------------------------------------------------
-   UPLOAD CONFIG
+   UPLOAD CONFIG — assets/ is one level up from admin/
 ---------------------------------------------------------------- */
 $uploadDirFs = __DIR__ . '/assets/images/loan-attachments/';
 $maxBytes    = 10 * 1024 * 1024;   // 10 MB
@@ -82,12 +107,26 @@ function save_loan_upload(array $file, string $fsDir, array $allowedMime, int $m
     if ($file['error'] !== UPLOAD_ERR_OK) return [null, 'Upload failed (code ' . $file['error'] . ').'];
     if ($file['size'] > $maxBytes) return [null, 'File exceeds 10 MB: ' . htmlspecialchars($file['name'])];
 
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $mime  = $finfo->file($file['tmp_name']);
-    if (!isset($allowedMime[$mime])) {
-        return [null, 'Unsupported file: ' . htmlspecialchars($file['name'])];
+    $mime = null;
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime  = $finfo->file($file['tmp_name']);
     }
-    $ext  = $allowedMime[$mime];
+    if (!$mime || !isset($allowedMime[$mime])) {
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $fallback = ['jpg'=>'jpg','jpeg'=>'jpg','png'=>'png','webp'=>'webp','gif'=>'gif','mp4'=>'mp4','webm'=>'webm','pdf'=>'pdf'];
+        if (!isset($fallback[$ext])) {
+            return [null, 'Unsupported file: ' . htmlspecialchars($file['name'])];
+        }
+        $ext = $fallback[$ext];
+    } else {
+        $ext = $allowedMime[$mime];
+    }
+
+    if (!is_writable($fsDir)) {
+        return [null, 'Upload folder is not writable.'];
+    }
+
     $name = date('Ymd_His') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
     $dest = rtrim($fsDir, '/\\') . DIRECTORY_SEPARATOR . $name;
     if (!move_uploaded_file($file['tmp_name'], $dest)) {
@@ -112,12 +151,12 @@ if ($res) { while ($r = $res->fetch_assoc()) $guarantors[] = $r; $res->free(); }
 ---------------------------------------------------------------- */
 $errors = [];
 $form = [
-    'client'    => '',
-    'issueDate' => date('Y-m-d'),
-    'loanType'  => '',
-    'principal' => '',
-    'guarantor' => '',
-    'notes'     => '',
+    'client'        => '',
+    'issueDate'     => date('Y-m-d'),
+    'loanCategory'  => '',
+    'principal'     => '',
+    'guarantor'     => '',
+    'notes'         => '',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -135,7 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Date of issue is invalid.';
     }
 
-    if ($form['loanType'] === '' || !array_key_exists($form['loanType'], $loanTerms)) {
+    if ($form['loanCategory'] === '' || !isset($loanCategories[$form['loanCategory']])) {
         $errors[] = 'Please choose a valid loan type.';
     }
 
@@ -144,25 +183,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Principal amount must be at least Ksh ' . number_format($minPrincipal, 0) . '.';
     } elseif ($principal > $maxPrincipal) {
         $errors[] = 'Principal amount cannot exceed Ksh ' . number_format($maxPrincipal, 0) . '.';
-    } else {
-        // Confirm a tier matches (defensive — should always be true inside bounds)
-        if (calc_interest_rate($principal, $interestTiers) === null) {
-            $errors[] = 'No interest rate matches that principal amount.';
-        }
     }
 
     $guarantorId = (int) $form['guarantor'];
     if ($guarantorId <= 0) $errors[] = 'Please choose a guarantor.';
 
+    /* ---- Confirm a rate exists for this category + principal ---- */
+    $interestRate = null;
+    if (empty($errors)) {
+        $interestRate = calc_category_rate($form['loanCategory'], $principal, $loanCategories);
+        if ($interestRate === null) {
+            $errors[] = 'No interest rate matches that principal for the selected loan type.';
+        }
+    }
+
     /* ---- Verify client exists ---- */
     if (empty($errors)) {
         $stmt = $conn->prepare("SELECT id FROM clients WHERE id = ? LIMIT 1");
-        $stmt->bind_param("i", $clientId);
-        $stmt->execute();
-        if (!$stmt->get_result()->fetch_assoc()) {
-            $errors[] = 'Selected client no longer exists.';
+        if ($stmt) {
+            $stmt->bind_param("i", $clientId);
+            $stmt->execute();
+            if (!$stmt->get_result()->fetch_assoc()) {
+                $errors[] = 'Selected client no longer exists.';
+            }
+            $stmt->close();
         }
-        $stmt->close();
+    }
+
+    /* ---- Verify guarantor exists ---- */
+    if (empty($errors)) {
+        $stmt = $conn->prepare("SELECT id FROM guarantors WHERE id = ? LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param("i", $guarantorId);
+            $stmt->execute();
+            if (!$stmt->get_result()->fetch_assoc()) {
+                $errors[] = 'Selected guarantor no longer exists.';
+            }
+            $stmt->close();
+        }
     }
 
     /* ---- Handle collateral uploads ---- */
@@ -186,28 +244,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /* ---- Insert ---- */
     if (empty($errors)) {
-        $loanCode      = gen_loan_code($conn);
-        $interestRate  = calc_interest_rate($principal, $interestTiers);   // safe: validated above
-        $dueDate       = calc_due_date($form['issueDate'], $form['loanType'], $loanTerms);
-        $uploadsJson   = !empty($uploadedFiles) ? json_encode($uploadedFiles) : null;
-        $purpose       = ucwords(str_replace('_', ' ', $form['loanType'])) . ' Loan';
-        $notes         = $form['notes'] !== '' ? $form['notes'] : null;
+        $loanCode     = gen_loan_code($conn);
+        $categoryCfg  = $loanCategories[$form['loanCategory']];
+        $termDays     = (int) $categoryCfg['term_days'];
+        $dueDate      = calc_due_date($form['issueDate'], $termDays);
+        $uploadsJson  = !empty($uploadedFiles) ? json_encode($uploadedFiles) : null;
+        $purpose      = $categoryCfg['label'];   // "Monthly Loan" / "Daily Loan" / "Jolly Boost Loan"
+        $notes        = $form['notes'] !== '' ? $form['notes'] : null;
 
-        /* NOTE: guarantor is validated but not persisted — your `loans`
-           table has no guarantor column. Add loan_guarantors join table
-           (recommended) or a guarantor_id column to persist it. */
+        $conn->begin_transaction();
+        try {
+            /* 1) Insert the loan */
+            $sql = "INSERT INTO loans
+                    (loan_code, client_id, date_issued,
+                     principal_amount, interest_rate, amount_paid,
+                     due_date, status, collateral_type,
+                     uploads, purpose, notes)
+                    VALUES (?, ?, ?, ?, ?, 0.00, ?, 'active', 'none', ?, ?, ?)";
 
-        $sql = "INSERT INTO loans
-                (loan_code, client_id, date_issued,
-                 principal_amount, interest_rate, amount_paid,
-                 due_date, status, collateral_type,
-                 uploads, purpose, notes)
-                VALUES (?, ?, ?, ?, ?, 0.00, ?, 'active', 'none', ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+            if (!$stmt) throw new Exception('Prepare loan failed: ' . $conn->error);
 
-        $stmt = $conn->prepare($sql);
-        if (!$stmt) {
-            $errors[] = 'Database error: ' . $conn->error;
-        } else {
             $stmt->bind_param(
                 "sisddssss",
                 $loanCode,
@@ -221,24 +278,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $notes
             );
 
-            if ($stmt->execute()) {
-                $_SESSION['flash'] = "Loan {$loanCode} registered successfully.";
-                $stmt->close();
-                $conn->close();
-                header("Location: loans.php");
-                exit;
-
-                $newLoanId = $stmt->insert_id;
-                $stmt->close();
-
-                $link = $conn->prepare("INSERT INTO loan_guarantors (loan_id, guarantor_id) VALUES (?, ?)");
-                $link->bind_param("ii", $newLoanId, $guarantorId);
-                $link->execute();
-                $link->close();
-            } else {
-                $errors[] = 'Could not save loan: ' . $stmt->error;
+            if (!$stmt->execute()) {
+                throw new Exception('Insert loan failed: ' . $stmt->error);
             }
+
+            $newLoanId = (int) $stmt->insert_id;
             $stmt->close();
+
+            /* 2) Link the guarantor (if the join table exists) */
+            $hasJoin = $conn->query("SHOW TABLES LIKE 'loan_guarantors'");
+            if ($hasJoin && $hasJoin->num_rows > 0) {
+
+                // Adapt to either schema — with or without `guaranteed_amount`
+                $hasAmountCol = false;
+                $col = $conn->query("SHOW COLUMNS FROM loan_guarantors LIKE 'guaranteed_amount'");
+                if ($col && $col->num_rows > 0) $hasAmountCol = true;
+
+                if ($hasAmountCol) {
+                    $link = $conn->prepare(
+                        "INSERT INTO loan_guarantors (loan_id, guarantor_id, guaranteed_amount)
+                         VALUES (?, ?, ?)"
+                    );
+                    if (!$link) throw new Exception('Prepare guarantor link failed: ' . $conn->error);
+                    $guaranteedAmount = $principal;
+                    $link->bind_param("iid", $newLoanId, $guarantorId, $guaranteedAmount);
+                } else {
+                    $link = $conn->prepare(
+                        "INSERT INTO loan_guarantors (loan_id, guarantor_id)
+                         VALUES (?, ?)"
+                    );
+                    if (!$link) throw new Exception('Prepare guarantor link failed: ' . $conn->error);
+                    $link->bind_param("ii", $newLoanId, $guarantorId);
+                }
+
+                if (!$link->execute()) {
+                    throw new Exception('Insert guarantor link failed: ' . $link->error);
+                }
+                $link->close();
+            }
+
+            $conn->commit();
+
+            $_SESSION['flash'] = "Loan {$loanCode} registered successfully.";
+            $conn->close();
+            header("Location: loans.php");
+            exit;
+
+        } catch (Throwable $ex) {
+            $conn->rollback();
+            $errors[] = 'Could not save loan: ' . $ex->getMessage();
         }
     }
 }
@@ -317,16 +405,14 @@ ob_start();
 
         <!-- Loan Type -->
         <div class="col-md-6">
-          <label class="form-label" for="loanType">Loan Type</label>
-          <select class="form-select" id="loanType" name="loanType" required>
+          <label class="form-label" for="loanCategory">Loan Type</label>
+          <select class="form-select" id="loanCategory" name="loanCategory" required>
             <option value="">Choose loan type</option>
-            <option value="personal"  <?= $form['loanType']==='personal'  ? 'selected':'' ?>>Personal Loan</option>
-            <option value="business"  <?= $form['loanType']==='business'  ? 'selected':'' ?>>Business Loan</option>
-            <option value="auto"      <?= $form['loanType']==='auto'      ? 'selected':'' ?>>Auto Loan</option>
-            <option value="mortgage"  <?= $form['loanType']==='mortgage'  ? 'selected':'' ?>>Mortgage</option>
-            <option value="education" <?= $form['loanType']==='education' ? 'selected':'' ?>>Education Loan</option>
-            <option value="emergency" <?= $form['loanType']==='emergency' ? 'selected':'' ?>>Emergency Loan</option>
+            <option value="monthly" <?= $form['loanCategory']==='monthly' ? 'selected':'' ?>>Monthly Loan</option>
+            <option value="daily"   <?= $form['loanCategory']==='daily'   ? 'selected':'' ?>>Daily Loan</option>
+            <option value="boost"   <?= $form['loanCategory']==='boost'   ? 'selected':'' ?>>Jolly Boost Loan</option>
           </select>
+          <div class="form-text" id="loanTypeHint">Select a loan type to see rate and term rules.</div>
           <div class="invalid-feedback">Choose a loan type.</div>
         </div>
 
@@ -337,11 +423,7 @@ ob_start();
                  min="5000" max="1000000" step="0.01" required
                  value="<?= htmlspecialchars($form['principal'], ENT_QUOTES, 'UTF-8') ?>">
           <div class="form-text">
-            Between Ksh 5,000 and Ksh 1,000,000.<br>
-            Tiers:
-            <strong>5k–100k → 20%</strong> ·
-            <strong>100k–500k → 18%</strong> ·
-            <strong>500k–1M → 15%</strong>
+            Between Ksh 5,000 and Ksh 1,000,000.
           </div>
           <div class="invalid-feedback">Enter a principal between Ksh 5,000 and Ksh 1,000,000.</div>
         </div>
@@ -350,7 +432,7 @@ ob_start();
         <div class="col-md-6">
           <label class="form-label" for="interestRate">Interest Rate (%)</label>
           <input class="form-control" id="interestRate" name="interestRate" type="text" readonly>
-          <div class="form-text">Automatically assigned based on the principal amount.</div>
+          <div class="form-text">Automatically assigned based on the loan type.</div>
         </div>
 
         <!-- Total Due (auto) -->
@@ -428,7 +510,7 @@ ob_start();
       </h2>
       <div class="activity-list">
         <div class="activity-item"><span class="activity-dot bg-success"></span><div><p class="mb-1 fw-semibold">Select registered client</p><p class="text-muted small mb-0">Only existing clients can be linked to a loan.</p></div></div>
-        <div class="activity-item"><span class="activity-dot bg-primary"></span><div><p class="mb-1 fw-semibold">Choose loan type</p><p class="text-muted small mb-0">Interest rate is based on the amount; term depends on type.</p></div></div>
+        <div class="activity-item"><span class="activity-dot bg-primary"></span><div><p class="mb-1 fw-semibold">Choose loan type</p><p class="text-muted small mb-0">Monthly (tiered), Daily (2.5%), or Jolly Boost (0%).</p></div></div>
         <div class="activity-item"><span class="activity-dot bg-warning"></span><div><p class="mb-1 fw-semibold">Assign guarantor</p><p class="text-muted small mb-0">Pick an existing guarantor or create a new one.</p></div></div>
         <div class="activity-item"><span class="activity-dot bg-info"></span><div><p class="mb-1 fw-semibold">Upload collateral</p><p class="text-muted small mb-0">Attach photos or videos of the pledged asset.</p></div></div>
         <div class="activity-item"><span class="activity-dot bg-secondary"></span><div><p class="mb-1 fw-semibold">Review & submit</p><p class="text-muted small mb-0">Verify auto-calculated amounts before saving.</p></div></div>
@@ -439,57 +521,92 @@ ob_start();
 
 <script>
 (() => {
-  /* Values mirrored from PHP — PHP is still authoritative on save. */
-  const INTEREST_TIERS = <?= json_encode($interestTiers, JSON_NUMERIC_CHECK) ?>;
-  const LOAN_TERMS     = <?= json_encode($loanTerms, JSON_NUMERIC_CHECK) ?>;
-  const MIN_PRINCIPAL  = <?= (float) $minPrincipal ?>;
-  const MAX_PRINCIPAL  = <?= (float) $maxPrincipal ?>;
+  /* Config from PHP — single source of truth */
+  const LOAN_CATEGORIES = <?= json_encode($loanCategories, JSON_NUMERIC_CHECK) ?>;
+  const MIN_PRINCIPAL   = <?= (float) $minPrincipal ?>;
+  const MAX_PRINCIPAL   = <?= (float) $maxPrincipal ?>;
 
   const $client     = document.getElementById('client');
   const $issueDate  = document.getElementById('issueDate');
-  const $loanType   = document.getElementById('loanType');
+  const $category   = document.getElementById('loanCategory');
   const $principal  = document.getElementById('principal');
   const $rate       = document.getElementById('interestRate');
   const $total      = document.getElementById('totalDue');
   const $due        = document.getElementById('dueDate');
   const $status     = document.getElementById('status');
+  const $hint       = document.getElementById('loanTypeHint');
   const $collateral = document.getElementById('collateral');
   const $preview    = document.getElementById('collateralPreview');
 
-  function calcRate(amount) {
-    for (const t of INTEREST_TIERS) {
+  function fmtKsh(n) {
+    return 'Ksh ' + Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  function categoryHint(catKey) {
+    const cfg = LOAN_CATEGORIES[catKey];
+    if (!cfg) return 'Select a loan type to see rate and term rules.';
+    if (cfg.rate_type === 'tiered') {
+      const tiers = cfg.tiers.map(t =>
+        `${(t.min/1000).toFixed(0)}k–${(t.max/1000).toFixed(0)}k → ${t.rate}%`
+      ).join(' · ');
+      return `Term: ${cfg.term_days} days. Rate tiers: ${tiers}`;
+    }
+    return `Term: ${cfg.term_days} day${cfg.term_days === 1 ? '' : 's'}. Flat rate: ${cfg.rate}%.`;
+  }
+
+  function calcRate(catKey, amount) {
+    const cfg = LOAN_CATEGORIES[catKey];
+    if (!cfg) return 0;
+
+    if (cfg.rate_type === 'flat') return cfg.rate;
+
+    for (const t of cfg.tiers) {
       if (amount >= t.min && amount <= t.max) return t.rate;
     }
-    return 0;   // out of range
+    return 0;
   }
 
   function refresh() {
-    const amount = parseFloat($principal.value) || 0;
+    const amount   = parseFloat($principal.value) || 0;
+    const catKey   = $category.value;
 
-    // Only show rate/total when the amount is within a valid tier
-    let rate  = 0;
-    let valid = false;
-    if (amount >= MIN_PRINCIPAL && amount <= MAX_PRINCIPAL) {
-      rate  = calcRate(amount);
-      valid = rate > 0;
+    // Hint under the dropdown
+    $hint.textContent = categoryHint(catKey);
+
+    if (!catKey || amount < MIN_PRINCIPAL || amount > MAX_PRINCIPAL) {
+      $rate.value   = '';
+      $total.value  = '';
+      $due.value    = '';
+      $status.value = 'Pending';
+      return;
     }
-    const total = valid ? amount * (1 + rate / 100) : 0;
 
-    $rate.value  = valid ? rate.toFixed(2) : '';
-    $total.value = valid ? total.toFixed(2) : '';
+    const cfg  = LOAN_CATEGORIES[catKey];
+    const rate = calcRate(catKey, amount);
+    const total = amount * (1 + rate / 100);
 
-    if ($issueDate.value && $loanType.value && LOAN_TERMS[$loanType.value]) {
+    // Rate field
+    if (cfg.rate_type === 'flat' && rate === 0) {
+      $rate.value = '0.00 (no interest)';
+    } else {
+      $rate.value = rate.toFixed(2);
+    }
+
+    $total.value = total.toFixed(2);
+
+    // Due date
+    if ($issueDate.value && cfg.term_days > 0) {
       const d = new Date($issueDate.value);
-      d.setDate(d.getDate() + LOAN_TERMS[$loanType.value]);
+      d.setDate(d.getDate() + cfg.term_days);
       $due.value = d.toISOString().slice(0, 10);
     } else {
       $due.value = '';
     }
 
-    $status.value = ($client.value && valid) ? 'Active' : 'Pending';
+    $status.value = ($client.value && rate >= 0) ? 'Active' : 'Pending';
   }
 
-  [$principal, $issueDate, $loanType, $client].forEach(el => {
+  [$principal, $issueDate, $category, $client].forEach(el => {
     if (el) el.addEventListener('input', refresh);
     if (el) el.addEventListener('change', refresh);
   });
