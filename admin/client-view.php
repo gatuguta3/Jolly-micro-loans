@@ -248,6 +248,8 @@ ob_start();
       <?php endif; ?>
     </div>
   </div>
+
+  
 </section>
 
 <!-- All loans table (header only — no loans table in DB yet) -->
