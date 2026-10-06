@@ -215,6 +215,14 @@ ob_start();
       <p class="text-muted mb-0">Latest payment activity across the workspace.</p>
     </div>
     <div class="heading-actions">
+       <div class="d-flex justify-content-center gap-2">
+            <input type="search"
+                  class="form-control form-control-sm"
+                  id="paymentSearch"
+                  placeholder="Search client name ..."
+                  style="max-width: 220px;">
+          
+        </div>
       <button class="btn btn-outline-secondary btn-sm" type="button">
         <i class="bi bi-download" aria-hidden="true"></i> Export
       </button>
@@ -225,7 +233,7 @@ ob_start();
   </div>
 
   <div class="table-responsive">
-    <table class="table align-middle mb-0">
+    <table class="table align-middle mb-0" id="paymentTable" >
       <thead>
         <tr>
           <th scope="col">Payment Id</th>
@@ -282,6 +290,22 @@ ob_start();
     </table>
   </div>
 </section>
+
+<script>
+(() => {
+  /* Client-side search filter for the loans table */
+  const $search = document.getElementById('paymentSearch');
+  const $table  = document.getElementById('paymentTable');
+  if (!$search || !$table) return;
+
+  $search.addEventListener('input', () => {
+    const q = $search.value.trim().toLowerCase();
+    $table.querySelectorAll('tbody tr').forEach(row => {
+      row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+})();
+</script>
 
 <?php
 $content = ob_get_clean();

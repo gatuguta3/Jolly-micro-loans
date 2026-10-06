@@ -162,6 +162,10 @@ ob_start();
     <a class="btn btn-outline-secondary btn-sm" href="payments.php">
       <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Payments
     </a>
+    <a class="btn btn-outline-secondary btn-sm "
+         href="loan-view.php?id=<?= (int) $payment['loan_id'] ?>">
+        <i class="bi bi-cash-coin" aria-hidden="true"></i> Back to Loan
+      </a>
     <a class="btn btn-primary btn-sm" href="payment-registration.php">
       <i class="bi bi-plus-circle" aria-hidden="true"></i> New Payment
     </a>

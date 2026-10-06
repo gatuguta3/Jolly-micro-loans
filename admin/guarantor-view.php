@@ -160,6 +160,11 @@ ob_start();
     <a class="btn btn-outline-secondary btn-sm" href="guarantors.php">
       <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Guarantors
     </a>
+    <a class="btn btn-outline-secondary btn-sm"
+            href="guarantor-report.php?id=<?= (int) $guarantor['id'] ?>"
+            target="_blank" rel="noopener">
+            <i class="bi bi-download" aria-hidden="true"></i> Report
+          </a>
     <a class="btn btn-outline-primary btn-sm" href="guarantor-edit.php?id=<?= (int) $guarantor['id'] ?>">
       <i class="bi bi-pencil-square" aria-hidden="true"></i> Edit Guarantor
     </a>

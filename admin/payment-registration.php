@@ -5,15 +5,41 @@ $activeNav = 'payments';
 /* ---------- DB CONNECTION ---------- */
 require_once __DIR__ . '/../config/db_connection.php';
 
+/* ---------- SESSION ---------- */
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 /* ----------------------------------------------------------------
+   DETERMINE DEFAULT CLIENT + LOAN
+   On GET:  prefer URL params (?client_id=X&loan_id=Y)
+   On POST: use what the user just submitted
+   No session persistence → fresh visits always start blank.
+---------------------------------------------------------------- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $defaultClientId = (int) ($_POST['client'] ?? 0);
+    $defaultLoanId   = (int) ($_POST['loanId'] ?? 0);
+} else {
+    $defaultClientId = isset($_GET['client_id']) ? (int) $_GET['client_id'] : 0;
+    $defaultLoanId   = isset($_GET['loan_id'])   ? (int) $_GET['loan_id']   : 0;
+
+    if ($defaultClientId === 0 && $defaultLoanId > 0) {
+        $stmt = $conn->prepare("SELECT client_id FROM loans WHERE id = ? LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param("i", $defaultLoanId);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if ($row) $defaultClientId = (int) $row['client_id'];
+        }
+    }
+}
+
+/* ----------------------------------------------------------------
    UPLOAD CONFIG
 ---------------------------------------------------------------- */
-$uploadDirFs = __DIR__ . '/assets/images/payment-attachments/';
-$maxBytes    = 5 * 1024 * 1024;   // 5 MB
+$uploadDirFs = __DIR__ . '/../assets/images/payment-uploads/';
+$maxBytes    = 5 * 1024 * 1024;
 $allowedMime = [
     'image/jpeg'      => 'jpg',
     'image/png'       => 'png',
@@ -60,14 +86,12 @@ function save_payment_upload(array $file, string $fsDir, array $allowedMime, int
 
     $name = date('Ymd_His') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
     $dest = rtrim($fsDir, '/\\') . DIRECTORY_SEPARATOR . $name;
-
     if (!move_uploaded_file($file['tmp_name'], $dest)) {
         return [null, 'Could not save: ' . htmlspecialchars($file['name'])];
     }
     return [$name, null];
 }
 
-/* Map form value → DB enum */
 function normalize_payment_mode(string $mode): string {
     return match ($mode) {
         'mpesa'         => 'mpesa',
@@ -90,21 +114,21 @@ if ($res) { while ($r = $res->fetch_assoc()) $clients[] = $r; $res->free(); }
 $loans = [];
 $res = $conn->query(
     "SELECT l.id, l.loan_code, l.client_id,
-            l.principal_amount, l.total_due, l.balance,
+            l.principal_amount, l.total_due, l.balance, l.principal_balance, l.interest_balance, l.amount_paid,
             l.status, l.purpose
      FROM loans l
-     WHERE l.status IN ('active','defaulted')
+     WHERE l.status IN ('active','overdue','defaulted')
      ORDER BY l.id DESC"
 );
 if ($res) { while ($r = $res->fetch_assoc()) $loans[] = $r; $res->free(); }
 
 /* ----------------------------------------------------------------
-   HANDLE POST
+   INITIAL FORM STATE
 ---------------------------------------------------------------- */
 $errors = [];
 $form = [
-    'client'     => '',
-    'loanId'     => '',
+    'client'     => $defaultClientId > 0 ? (string) $defaultClientId : '',
+    'loanId'     => $defaultLoanId   > 0 ? (string) $defaultLoanId   : '',
     'amountPaid' => '',
     'datePaid'   => date('Y-m-d'),
     'mode'       => '',
@@ -112,6 +136,9 @@ $form = [
     'notes'      => '',
 ];
 
+/* ----------------------------------------------------------------
+   HANDLE POST
+---------------------------------------------------------------- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     foreach ($form as $k => $v) {
@@ -140,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $loan = null;
     if (empty($errors)) {
         $stmt = $conn->prepare(
-            "SELECT id, client_id, loan_code, total_due, amount_paid, balance, status
+            "SELECT id, client_id, loan_code, total_due, amount_paid, balance, principal_balance, interest_balance, status
              FROM loans WHERE id = ? LIMIT 1"
         );
         $stmt->bind_param("i", $loanId);
@@ -160,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    /* ---- Handle proof upload (first file only — matches `upload` column) ---- */
+    /* ---- Handle proof upload (first file only) ---- */
     $uploadedFile = null;
     if (empty($errors) && !empty($_FILES['proof']['name'][0])) {
         $one = [
@@ -177,11 +204,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    /* ---- Insert payment + update loan (transaction) ---- */
+    /* ---- Insert payment + update loan ---- */
+       /* ---- Insert payment + allocate to interest, then principal ---- */
     if (empty($errors)) {
         $paymentCode = gen_payment_code($conn);
         $reference   = $form['reference'] !== '' ? $form['reference'] : null;
         $remarks     = $form['notes']     !== '' ? $form['notes']     : null;
+
+        /* Current balances (from the loan row already fetched) */
+        $interestBal  = (float) $loan['interest_balance'];
+        $principalBal = (float) $loan['principal_balance'];
+        $amountPaidAlready = (float) $loan['amount_paid'];
+
+        /* ---------- Allocate the payment ---------- */
+        $remainder = $amountPaid;
+
+        if ($remainder >= $interestBal) {
+            /* Wipe out interest first */
+            $remainder   -= $interestBal;
+            $interestBal  = 0.0;
+
+            /* Then attack the principal */
+            if ($remainder > 0) {
+                $principalBal = max(0.0, $principalBal - $remainder);
+                $remainder    = 0.0;
+            }
+        } else {
+            /* Payment only covers part of the interest */
+            $interestBal -= $remainder;
+            $remainder    = 0.0;
+        }
+
+        /* New cumulative amount_paid */
+        $newAmountPaid = $amountPaidAlready + $amountPaid;
+
+        /* Status: cleared when nothing remains */
+        $newStatus = $loan['status'];
+        if ($interestBal <= 0.009 && $principalBal <= 0.009) {
+            $newStatus = 'cleared';
+        }
+
+        /* Round to 2dp to avoid float drift */
+        $interestBal  = round($interestBal, 2);
+        $principalBal = round($principalBal, 2);
 
         $conn->begin_transaction();
         try {
@@ -209,23 +274,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$stmt->execute()) throw new Exception('Insert payment failed: ' . $stmt->error);
             $stmt->close();
 
-            /* 2) Recompute loan.amount_paid from all payments + auto-clear */
+            /* 2) Update the loan's balances + cumulative amount_paid + status */
             $upd = $conn->prepare(
-                "UPDATE loans l
-                 SET l.amount_paid = (
-                     SELECT COALESCE(SUM(p.amount_paid), 0)
-                     FROM payments p WHERE p.loan_id = l.id
-                 ),
-                 l.status = CASE
-                     WHEN (SELECT COALESCE(SUM(p.amount_paid), 0)
-                           FROM payments p WHERE p.loan_id = l.id) >= l.total_due
-                         THEN 'cleared'
-                     ELSE l.status
-                 END
-                 WHERE l.id = ?"
+                "UPDATE loans
+                 SET interest_balance  = ?,
+                     principal_balance = ?,
+                     amount_paid       = ?,
+                     status            = ?
+                 WHERE id = ?"
             );
             if (!$upd) throw new Exception('Prepare update failed: ' . $conn->error);
-            $upd->bind_param("i", $loanId);
+
+            $upd->bind_param(
+                "dddsi",
+                $interestBal,
+                $principalBal,
+                $newAmountPaid,
+                $newStatus,
+                $loanId
+            );
             if (!$upd->execute()) throw new Exception('Update loan failed: ' . $upd->error);
             $upd->close();
 
@@ -236,7 +303,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                               . " recorded for {$loan['loan_code']}.";
 
             $conn->close();
-            header("Location: payments.php");
+
+            header("Location: loan-view.php?id=" . $loanId);
             exit;
 
         } catch (Throwable $ex) {
@@ -409,7 +477,8 @@ ob_start();
   const $hint   = document.getElementById('loanHint');
   const $bal    = document.getElementById('balanceHint');
 
-  const preselectedLoan = "<?= htmlspecialchars($form['loanId'], ENT_QUOTES, 'UTF-8') ?>";
+  const PRESELECTED_CLIENT = "<?= htmlspecialchars($form['client'], ENT_QUOTES, 'UTF-8') ?>";
+  const PRESELECTED_LOAN   = "<?= htmlspecialchars($form['loanId'], ENT_QUOTES, 'UTF-8') ?>";
 
   function fmtKsh(n) {
     return 'Ksh ' + Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -446,7 +515,7 @@ ob_start();
         + ' — ' + (l.purpose || 'Loan')
         + ' (Balance: ' + fmtKsh(l.balance) + ')';
       opt.dataset.balance = l.balance;
-      if (String(l.id) === String(preselectedLoan)) opt.selected = true;
+      if (String(l.id) === String(PRESELECTED_LOAN)) opt.selected = true;
       $loan.appendChild(opt);
     });
 
@@ -468,6 +537,10 @@ ob_start();
 
   $client.addEventListener('change', refreshLoans);
   $loan.addEventListener('change', updateBalanceHint);
+
+  if (PRESELECTED_CLIENT) {
+    $client.value = PRESELECTED_CLIENT;
+  }
   refreshLoans();
 
   /* Proof preview */

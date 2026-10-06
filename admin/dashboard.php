@@ -53,7 +53,7 @@ if ($res && $r = $res->fetch_assoc()) {
 /* Outstanding balance (active + defaulted loans) */
 $res = $conn->query(
     "SELECT COALESCE(SUM(balance), 0) AS total
-     FROM loans WHERE status IN ('active','defaulted')"
+     FROM loans WHERE status IN ('active','overdue','defaulted')"
 );
 if ($res && $r = $res->fetch_assoc()) {
     $top['outstanding'] = (float) $r['total'];
@@ -102,7 +102,7 @@ $res = $conn->query(
         SUM(CASE WHEN status = 'active'    THEN 1 ELSE 0 END) AS active_cnt,
         SUM(CASE WHEN status = 'cleared'   THEN 1 ELSE 0 END) AS cleared_cnt,
         SUM(CASE WHEN status = 'defaulted' THEN 1 ELSE 0 END) AS defaulted_cnt,
-        SUM(CASE WHEN status = 'active' AND due_date < CURRENT_DATE THEN 1 ELSE 0 END) AS overdue_cnt,
+        SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END) AS overdue_cnt,
         SUM(CASE WHEN status = 'active' AND due_date = CURRENT_DATE THEN 1 ELSE 0 END) AS due_today_cnt,
         COALESCE(SUM(CASE WHEN status IN ('active','defaulted') THEN balance ELSE 0 END), 0) AS balance_due
      FROM loans"
@@ -249,6 +249,28 @@ unset($a);
 ob_start();
 ?>
 
+<style>
+  /* ---------- Hide/show dashboard values ---------- */
+  .dashboard-root.values-hidden .metric-value,
+  .dashboard-root.values-hidden .metric-meta,
+  .dashboard-root.values-hidden .donut-chart > span,
+  .dashboard-root.values-hidden .legend-list strong {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+    transition: filter .15s ease;
+  }
+
+  /* Slight visual hint that the value is intentionally hidden */
+  .dashboard-root.values-hidden .metric-value::selection,
+  .dashboard-root.values-hidden .metric-meta::selection {
+    background: transparent;
+  }
+</style>
+
+<!-- Wrapper so the toggle only affects this page -->
+<div class="dashboard-root values-hidden" id="dashboardRoot">
+
 <!-- ============ Page heading ============ -->
 <div class="page-heading">
   <div class="page-heading-copy">
@@ -260,6 +282,11 @@ ob_start();
     </div>
   </div>
   <div class="heading-actions">
+    <button class="btn btn-outline-secondary btn-sm" type="button" id="toggleValuesBtn"
+            aria-pressed="true" title="Toggle card values">
+      <i class="bi bi-eye" aria-hidden="true"></i>
+      <span class="d-none d-sm-inline">Show values</span>
+    </button>
     <button class="btn btn-outline-secondary btn-sm" type="button">
       <i class="bi bi-download" aria-hidden="true"></i> Export
     </button>
@@ -279,8 +306,8 @@ ob_start();
         <span class="metric-icon"><i class="bi bi-currency-dollar" aria-hidden="true"></i></span>
       </div>
       <div class="metric-value"><?= d_ksh($top['total_principal']) ?></div>
-      <div class="metric-meta">
-        <span class="<?= $deltaPrincipal['delta'] >= 0 ? 'text-success' : 'text-danger' ?>">
+      <div class="metric-meta  h1">
+        <span class=" <?= $deltaPrincipal['delta'] >= 0 ? 'text-success' : 'text-danger' ?>">
           <?= ($deltaPrincipal['delta'] >= 0 ? '+' : '') . d_pct($deltaPrincipal['delta']) ?>
         </span>
         <span>from last month</span>
@@ -412,20 +439,6 @@ ob_start();
     </article>
   </div>
 
-  <div class="col-12 col-sm-6 col-xl-3">
-    <article class="metric-card metric-danger">
-      <div class="metric-top">
-        <span class="metric-label">Total loan value due</span>
-        <span class="metric-icon"><i class="bi bi-life-preserver" aria-hidden="true"></i></span>
-      </div>
-      <div class="metric-value"><?= d_ksh($loans['total_due_value']) ?></div>
-      <div class="metric-meta">
-        <span class="text-danger"><?= number_format($loans['active'] + $loans['defaulted']) ?> loans</span>
-        <span>Check them out</span>
-      </div>
-    </article>
-  </div>
-
 </section>
 
 <!-- ============ Charts / Team activity / Performance ============ -->
@@ -549,49 +562,93 @@ ob_start();
 
 </section>
 
+</div><!-- /.dashboard-root -->
+
 <script>
 (() => {
-  const list = document.getElementById('activityList');
-  if (!list) return;
+  /* ================================================================
+     Activity pagination (unchanged)
+  ================================================================ */
+  (() => {
+    const list = document.getElementById('activityList');
+    if (!list) return;
 
-  const items   = list.querySelectorAll('.activity-page-item');
-  const prevBtn = document.getElementById('activityPrev');
-  const nextBtn = document.getElementById('activityNext');
-  const counter = document.getElementById('activityCounter');
-  const range   = document.getElementById('activityRange');
+    const items   = list.querySelectorAll('.activity-page-item');
+    const prevBtn = document.getElementById('activityPrev');
+    const nextBtn = document.getElementById('activityNext');
+    const counter = document.getElementById('activityCounter');
+    const range   = document.getElementById('activityRange');
 
-  // Nothing to paginate
-  if (!items.length || !prevBtn || !nextBtn) return;
+    if (!items.length || !prevBtn || !nextBtn) return;
 
-  const PER_PAGE   = 5;
-  const TOTAL      = items.length;
-  const TOTAL_PAGES = Math.ceil(TOTAL / PER_PAGE);
-  let page = 1;
+    const PER_PAGE   = 5;
+    const TOTAL      = items.length;
+    const TOTAL_PAGES = Math.ceil(TOTAL / PER_PAGE);
+    let page = 1;
 
-  function render() {
-    const start = (page - 1) * PER_PAGE;
-    const end   = Math.min(start + PER_PAGE, TOTAL);
+    function render() {
+      const start = (page - 1) * PER_PAGE;
+      const end   = Math.min(start + PER_PAGE, TOTAL);
 
-    items.forEach((el, i) => {
-      el.style.display = (i >= start && i < end) ? '' : 'none';
+      items.forEach((el, i) => {
+        el.style.display = (i >= start && i < end) ? '' : 'none';
+      });
+
+      prevBtn.disabled = page === 1;
+      nextBtn.disabled = page === TOTAL_PAGES;
+
+      if (counter) counter.textContent = `Page ${page} of ${TOTAL_PAGES}`;
+      if (range)   range.textContent   = `${start + 1}–${end} of ${TOTAL}`;
+    }
+
+    prevBtn.addEventListener('click', () => { if (page > 1) { page--; render(); } });
+    nextBtn.addEventListener('click', () => { if (page < TOTAL_PAGES) { page++; render(); } });
+
+    render();
+  })();
+
+  /* ================================================================
+     Toggle: hide / show card values
+     Persisted in localStorage. Default: hidden.
+  ================================================================ */
+  (() => {
+    const root = document.getElementById('dashboardRoot');
+    const btn  = document.getElementById('toggleValuesBtn');
+    if (!root || !btn) return;
+
+    const STORAGE_KEY = 'jml_dashboard_values_hidden';
+    const iconEl  = btn.querySelector('i');
+    const labelEl = btn.querySelector('span');
+
+    function apply(hidden) {
+      root.classList.toggle('values-hidden', hidden);
+      btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+      btn.setAttribute('title', hidden ? 'Show values' : 'Hide values');
+
+      if (iconEl) {
+        iconEl.classList.toggle('bi-eye',        hidden);
+        iconEl.classList.toggle('bi-eye-slash', !hidden);
+      }
+      if (labelEl) {
+        labelEl.textContent = hidden ? 'Show values' : 'Hide values';
+      }
+    }
+
+    /* Default state: hidden. Override from localStorage if the user set a preference. */
+    let hidden = true;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored !== null) hidden = (stored === '1');
+    } catch (e) { /* localStorage blocked — fall back to default */ }
+
+    apply(hidden);
+
+    btn.addEventListener('click', () => {
+      hidden = !hidden;
+      apply(hidden);
+      try { localStorage.setItem(STORAGE_KEY, hidden ? '1' : '0'); } catch (e) {}
     });
-
-    prevBtn.disabled = page === 1;
-    nextBtn.disabled = page === TOTAL_PAGES;
-
-    if (counter) counter.textContent = `Page ${page} of ${TOTAL_PAGES}`;
-    if (range)   range.textContent   = `${start + 1}–${end} of ${TOTAL}`;
-  }
-
-  prevBtn.addEventListener('click', () => {
-    if (page > 1) { page--; render(); }
-  });
-
-  nextBtn.addEventListener('click', () => {
-    if (page < TOTAL_PAGES) { page++; render(); }
-  });
-
-  render();   // first paint
+  })();
 })();
 </script>
 

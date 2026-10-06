@@ -24,7 +24,7 @@ $stmt = $conn->prepare(
     "SELECT
         l.id, l.loan_code, l.date_issued, l.principal_amount,
         l.interest_rate, l.interest_amount, l.total_due,
-        l.amount_paid, l.balance, l.due_date, l.status,
+        l.principal_balance, l.interest_balance, l.amount_paid, l.balance, l.due_date, l.status,
         l.collateral_type, l.collateral_description,
         l.uploads, l.purpose, l.notes,
         l.created_at,
@@ -187,7 +187,10 @@ ob_start();
   </div>
   <div class="heading-actions">
     <a class="btn btn-outline-secondary btn-sm" href="loans.php">
-      <i class="bi bi-arrow-left" aria-hidden="true"></i> Back
+      <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to loans
+    </a>
+    <a class="btn btn-outline-secondary btn-sm" href="client-view.php?id=<?= (int) $loan['client_id'] ?>">
+      <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to client
     </a>
     <a class="btn btn-primary btn-sm" href="loan-registration.php">
       <i class="bi bi-plus-circle" aria-hidden="true"></i> Add Loan
@@ -288,6 +291,18 @@ ob_start();
           <div class="mini-card">
             <span>Balance</span>
             <strong><?= lv_ksh($loan['balance']) ?></strong>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mini-card">
+            <span>Principal Balance</span>
+            <strong><?= lv_ksh($loan['principal_balance']) ?></strong>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mini-card">
+            <span>Interest Balance</span>
+            <strong><?= lv_ksh($loan['interest_balance']) ?></strong>
           </div>
         </div>
         <div class="col-md-6">
@@ -399,7 +414,7 @@ ob_start();
         </div>
         <?php if ($loan['status'] !== 'cleared' && $loan['status'] !== 'written_off'): ?>
           <a class="btn btn-primary btn-sm"
-             href="payment-registration.php?loan_id=<?= (int) $loan['id'] ?>">
+             href="payment-registration.php?loan_id=<?= (int) $loan['id'] ?>&amp;client_id=<?= (int) $loan['client_id'] ?>">
             <i class="bi bi-plus-circle" aria-hidden="true"></i> Record Payment
           </a>
         <?php else: ?>

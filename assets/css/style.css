@@ -8,7 +8,7 @@
   --admin-text: #1f2937;
   --admin-muted: #6b7280;
   --admin-primary: #2563eb;
-  --admin-primary-dark: #1d4ed8;
+  --admin-primary-dark: #042a92;
   --admin-success: #0f766e;
   --admin-warning: #d97706;
   --admin-danger: #dc2626;
@@ -545,7 +545,7 @@ html[data-theme="dark"] .profile-button .avatar-sm {
 .metric-value {
   margin-top: 1rem;
   color: var(--admin-text);
-  font-size: 2.18rem;
+  font-size: 0.78rem;
   font-weight: 800;
   line-height: 1;
 }

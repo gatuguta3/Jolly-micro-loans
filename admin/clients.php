@@ -71,13 +71,21 @@ ob_start();
       <p class="text-muted mb-0">Latest account activity across the workspace.</p>
     </div>
     <div class="heading-actions">
+      <div class="d-flex justify-content-center gap-2">
+            <input type="search"
+                  class="form-control form-control-sm"
+                  id="clientSearch"
+                  placeholder="Search client..."
+                  style="max-width: 220px;">
+          
+          </div>
       <button class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-download" aria-hidden="true"></i> Export</button>
       <a class="btn btn-primary btn-sm" href="client-registration.php"><i class="bi bi-person-plus" aria-hidden="true"></i> Add Client</a>
     </div>
   </div>
 
   <div class="table-responsive">
-    <table class="table align-middle mb-0">
+    <table class="table align-middle mb-0" id="clientTable">
       <thead>
         <tr>
           <th scope="col">Client Id</th>
@@ -126,6 +134,22 @@ ob_start();
     </table>
   </div>
 </section>
+
+<script>
+(() => {
+  /* Client-side search filter for the loans table */
+  const $search = document.getElementById('clientSearch');
+  const $table  = document.getElementById('clientTable');
+  if (!$search || !$table) return;
+
+  $search.addEventListener('input', () => {
+    const q = $search.value.trim().toLowerCase();
+    $table.querySelectorAll('tbody tr').forEach(row => {
+      row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+})();
+</script>
 
 <?php
 $content = ob_get_clean();

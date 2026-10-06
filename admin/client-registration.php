@@ -14,7 +14,7 @@ if (session_status() === PHP_SESSION_NONE) {
    UPLOAD CONFIG
    assets/ is NOT inside admin/, so we go one level up
 ---------------------------------------------------------------- */
-$uploadDirFs  = __DIR__ . '/../assets/images/client-attachments/';
+$uploadDirFs  = __DIR__ . '/assets/images/client-attachments/';
 $maxBytes     = 8 * 1024 * 1024;   // 8 MB
 $allowedMime  = [
     'image/jpeg'      => 'jpeg',
@@ -39,7 +39,6 @@ function gen_client_code(mysqli $conn): string {
 }
 
 function save_upload(array $file, string $fsDir, array $allowedMime, int $maxBytes): array {
-    // returns [filename|null, error|null]
     if (!isset($file['error']) || $file['error'] === UPLOAD_ERR_NO_FILE) {
         return [null, null];
     }
@@ -72,11 +71,11 @@ function save_upload(array $file, string $fsDir, array $allowedMime, int $maxByt
 $errors = [];
 $form = [
     'firstName' => '',
-    'lastName'  => '',
+    
     'email'     => '',
     'phone'     => '',
     'idNo'      => '',
-    'dob'       => '',
+    'location'  => '',
     'notes'     => '',
 ];
 
@@ -88,13 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /* ---- Validation ---- */
     if ($form['firstName'] === '') $errors[] = 'First name is required.';
-    if ($form['lastName']  === '') $errors[] = 'Last name is required.';
-    if ($form['email']     === '') $errors[] = 'Email is required.';
-    elseif (!filter_var($form['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Enter a valid email.';
+   
     if ($form['phone']     === '') $errors[] = 'Phone is required.';
     if ($form['idNo']      === '') $errors[] = 'ID number is required.';
-    if ($form['dob']       === '') $errors[] = 'Date of birth is required.';
-    elseif (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $form['dob'])) $errors[] = 'Date of birth is invalid.';
 
     /* ---- Duplicate checks ---- */
     if (empty($errors)) {
@@ -129,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     /* ---- Insert ---- */
     if (empty($errors)) {
         $clientCode = gen_client_code($conn);
-        $fullName   = $form['firstName'] . ' ' . $form['lastName'];
+        $fullName   = $form['firstName'] ;
 
         // First image → photo_url ; all files → uploads JSON
         $photoFile = null;
@@ -142,18 +137,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $createdBy = $_SESSION['user_id'] ?? null;
         $email     = $form['email'];
-        $notes     = $form['notes'] !== '' ? $form['notes'] : null;
+        $location  = $form['location'] !== '' ? $form['location'] : null;
+        $notes     = $form['notes']    !== '' ? $form['notes']    : null;
 
         $sql = "INSERT INTO clients
                 (client_code, full_name, email, phone, id_number,
-                 date_of_birth, photo_url, uploads, notes, created_by)
+                 location, photo_url, uploads, notes, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         $stmt = $conn->prepare($sql);
         if (!$stmt) {
             $errors[] = 'Database error: ' . $conn->error;
         } else {
-            // types: code,fname,email,phone,idno,dob,photo,uploads,notes,created_by
+            // types: code,fname,email,phone,idno,location,photo,uploads,notes,created_by
             $stmt->bind_param(
                 "sssssssssi",
                 $clientCode,
@@ -161,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $email,
                 $form['phone'],
                 $form['idNo'],
-                $form['dob'],
+                $location,
                 $photoFile,
                 $uploadsJson,
                 $notes,
@@ -228,22 +224,16 @@ ob_start();
 
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label" for="firstName">First name</label>
+          <label class="form-label" for="firstName">Full name</label>
           <input class="form-control" id="firstName" name="firstName" type="text" required
                  value="<?= htmlspecialchars($form['firstName'], ENT_QUOTES, 'UTF-8') ?>">
           <div class="invalid-feedback">First name is required.</div>
         </div>
-
-        <div class="col-md-6">
-          <label class="form-label" for="lastName">Last name</label>
-          <input class="form-control" id="lastName" name="lastName" type="text" required
-                 value="<?= htmlspecialchars($form['lastName'], ENT_QUOTES, 'UTF-8') ?>">
-          <div class="invalid-feedback">Last name is required.</div>
-        </div>
+       
 
         <div class="col-md-6">
           <label class="form-label" for="email">Email</label>
-          <input class="form-control" id="email" name="email" type="email" required
+          <input class="form-control" id="email" name="email" type="email" 
                  value="<?= htmlspecialchars($form['email'], ENT_QUOTES, 'UTF-8') ?>">
           <div class="invalid-feedback">Enter a valid email.</div>
         </div>
@@ -263,10 +253,10 @@ ob_start();
         </div>
 
         <div class="col-md-6">
-          <label class="form-label" for="dob">Date of birth</label>
-          <input class="form-control" id="dob" name="dob" type="date" required
-                 value="<?= htmlspecialchars($form['dob'], ENT_QUOTES, 'UTF-8') ?>">
-          <div class="invalid-feedback">Date of birth is required.</div>
+          <label class="form-label" for="location">Location</label>
+          <input class="form-control" id="location" name="location" type="text"
+                 placeholder="Town / County"
+                 value="<?= htmlspecialchars($form['location'], ENT_QUOTES, 'UTF-8') ?>">
         </div>
 
         <div class="col-12">
@@ -333,7 +323,7 @@ ob_start();
           <span class="activity-dot bg-primary"></span>
           <div>
             <p class="mb-1 fw-semibold">Verify personal details</p>
-            <p class="text-muted small mb-0">Confirm first name, last name, and date of birth.</p>
+            <p class="text-muted small mb-0">Confirm the client's first and last name.</p>
           </div>
         </div>
         <div class="activity-item">
@@ -353,8 +343,8 @@ ob_start();
         <div class="activity-item">
           <span class="activity-dot bg-info"></span>
           <div>
-            <p class="mb-1 fw-semibold">Upload profile photo</p>
-            <p class="text-muted small mb-0">A clear photo helps identify the client.</p>
+            <p class="mb-1 fw-semibold">Record location</p>
+            <p class="text-muted small mb-0">Note the client's town or county for follow-ups.</p>
           </div>
         </div>
         <div class="activity-item">

@@ -42,11 +42,11 @@ if (!$client) {
 $loans = [];
 $stmt = $conn->prepare(
     "SELECT id, loan_code, loan_category, date_issued, principal_amount,
-            interest_rate, interest_amount, total_due, amount_paid,
+            interest_rate, interest_amount, total_due,
             balance, due_date, status, purpose
      FROM loans
      WHERE client_id = ?
-     ORDER BY id DESC"
+     ORDER BY date_issued DESC"
 );
 $stmt->bind_param("i", $clientId);
 $stmt->execute();
@@ -61,19 +61,30 @@ $defaultedCount       = 0;
 $defaultedOutstanding = 0.0;
 $clearedCount         = 0;
 $clearedRepaid        = 0.0;
+$writtenOffCount      = 0;
+
+$totalOutstanding     = 0.0;
 
 foreach ($loans as $l) {
     $bal  = (float) $l['balance'];
     $paid = (float) $l['amount_paid'];
+
     switch ($l['status']) {
         case 'active':
         case 'overdue':
             $activeCount++;
             $activeOutstanding += $bal;
+            $totalOutstanding  += $bal;
             break;
         case 'defaulted':
             $defaultedCount++;
             $defaultedOutstanding += $bal;
+            $totalOutstanding     += $bal;
+            break;
+        case 'written_off':
+            $writtenOffCount++;
+            $totalOutstanding     += $bal;
+            // Written-off loans are not counted in totals
             break;
         case 'cleared':
             $clearedCount++;
@@ -155,10 +166,15 @@ ob_start();
     <a class="btn btn-outline-secondary btn-sm" href="clients.php">
       <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Clients
     </a>
+    <a class="btn btn-outline-secondary btn-sm"
+            href="client-report.php?id=<?= (int) $client['id'] ?>"
+            target="_blank" rel="noopener">
+            <i class="bi bi-download" aria-hidden="true"></i> Report
+          </a>
     <a class="btn btn-outline-primary btn-sm" href="client-edit.php?id=<?= (int) $client['id'] ?>">
       <i class="bi bi-pencil-square" aria-hidden="true"></i> Edit Client
     </a>
-    <a class="btn btn-primary btn-sm" href="loan-registration.php">
+    <a class="btn btn-primary btn-sm" href="loan-registration.php?id=<?= (int) $client['id'] ?>">
       <i class="bi bi-plus-circle" aria-hidden="true"></i> Add Loan
     </a>
   </div>
@@ -189,8 +205,7 @@ ob_start();
         <div><span>Email</span><strong><?= htmlspecialchars($client['email'] ?? '—', ENT_QUOTES, 'UTF-8') ?></strong></div>
         <div><span>Phone</span><strong><?= htmlspecialchars($client['phone'], ENT_QUOTES, 'UTF-8') ?></strong></div>
         <div><span>ID No</span><strong><?= htmlspecialchars($client['id_number'], ENT_QUOTES, 'UTF-8') ?></strong></div>
-        <div><span>Date of Birth</span><strong><?= htmlspecialchars($dobDate) ?></strong></div>
-        <div><span>Gender</span><strong><?= $client['gender'] ? htmlspecialchars(ucfirst($client['gender'])) : '—' ?></strong></div>
+      
         <div><span>Date of Joining</span><strong><?= htmlspecialchars($joinDate) ?></strong></div>
         <div><span>Location</span><strong><?= htmlspecialchars($client['location'] ?? '—', ENT_QUOTES, 'UTF-8') ?></strong></div>
       </div>
@@ -216,7 +231,7 @@ ob_start();
             <i class="bi bi-cash-coin text-success fs-5"></i>
           </div>
           <strong class="fs-3"><?= number_format($activeCount) ?></strong>
-          <small class="text-muted"><?= client_ksh($activeOutstanding) ?> outstanding</small>
+          <small class="fs-5"><?= client_ksh($activeOutstanding) ?> outstanding</small>
         </div>
       </div>
 
@@ -326,9 +341,7 @@ ob_start();
                   id="loanSearch"
                   placeholder="Search loans..."
                   style="max-width: 220px;">
-            <button class="btn btn-outline-secondary btn-sm" type="button">
-              <i class="bi bi-download" aria-hidden="true"></i> Export
-            </button>
+          
           </div>
         </div>
 
@@ -340,6 +353,7 @@ ob_start();
                 <th scope="col">Client</th>
                 <th scope="col">Date Issued</th>
                 <th scope="col">Principal Amount</th>
+                <th scope="col">Amount Due</th>
                 <th scope="col">Due date</th>
                 <th scope="col">Status</th>
                 <th scope="col" class="text-end">Action</th>
@@ -349,7 +363,7 @@ ob_start();
 
               <?php if (empty($loans)): ?>
                 <tr>
-                  <td colspan="7" class="text-center text-muted py-4">
+                  <td colspan="8" class="text-center text-muted py-4">
                     No loans recorded for this client yet.
                   </td>
                 </tr>
@@ -382,16 +396,36 @@ ob_start();
                     </td>
                     <td><?= htmlspecialchars($issuedFmt) ?></td>
                     <td><?= client_ksh($l['principal_amount']) ?></td>
+                    <td><?= client_ksh($l['balance']) ?></td>
                     <td><?= htmlspecialchars($dueFmt) ?></td>
                     <td><span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($badgeLabel) ?></span></td>
                     <td class="text-end">
-                      <a class="btn btn-light btn-sm" href="loan-view.php?id=<?= (int) $l['id'] ?>">View</a>
+                      <div class="d-inline-flex gap-1">
+                        <a class="btn btn-light btn-sm"
+                          href="loan-view.php?id=<?= (int) $l['id'] ?>"
+                          title="View loan">
+                          View
+                        </a>
+                        <a class="btn btn-outline-secondary btn-sm"
+                          href="loan-print.php?id=<?= (int) $l['id'] ?>"
+                          target="_blank" rel="noopener"
+                          title="Print statement">
+                          <i class="bi bi-printer" aria-hidden="true"></i>
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>
               <?php endif; ?>
 
             </tbody>
+            <tfoot class="table-light">
+              <tr>
+                <th colspan="7" class="text-end">Total Amount Due</th>
+                <th class="text-end"><?= client_ksh($totalOutstanding) ?></th>
+                <th colspan="5"></th>
+              </tr>
+            </tfoot>
           </table>
         </div>
 

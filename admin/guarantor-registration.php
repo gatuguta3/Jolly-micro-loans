@@ -97,9 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($form['guarantorName'] === '') {
         $errors[] = 'Guarantor name is required.';
     }
-    if ($form['email'] !== '' && !filter_var($form['email'], FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Enter a valid email.';
-    }
+   
     if ($form['idNo'] === '') {
         $errors[] = 'ID number is required.';
     }

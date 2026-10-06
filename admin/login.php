@@ -167,9 +167,15 @@ unset($_SESSION['flash']);
   </button>
   <main class="auth-page">
     <section class="auth-card">
-      <a class="auth-brand" href="index.html">
-        <span class="brand-icon"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i></span>
-        <span><strong>Jolly Micro Loans</strong><small>Sign in to your admin workspace.</small></span>
+     <a class="auth-brand" href="login.php">
+        <img src="../assets/images/icon.png"
+            alt="Jolly Ventures"
+            class="auth-brand-logo"
+            width="26" height="26">
+        <span>
+          <strong>Jolly Ventures</strong>
+          <small>Sign in to your admin workspace.</small>
+        </span>
       </a>
       <div class="auth-visual">
         <img src="../assets/images/png/dasher-ui-bootstrap-5.jpg" alt="adminHMD dashboard interface">
