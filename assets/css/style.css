@@ -545,7 +545,7 @@ html[data-theme="dark"] .profile-button .avatar-sm {
 .metric-value {
   margin-top: 1rem;
   color: var(--admin-text);
-  font-size: 0.78rem;
+  font-size: 1.78rem;
   font-weight: 800;
   line-height: 1;
 }

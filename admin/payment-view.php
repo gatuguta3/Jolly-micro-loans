@@ -162,6 +162,20 @@ ob_start();
     <a class="btn btn-outline-secondary btn-sm" href="payments.php">
       <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Payments
     </a>
+     <a class="btn btn-outline-primary btn-sm"
+     href="payment-edit.php?id=<?= (int) $p['id'] ?>"
+     title="Edit payment">
+    <i class="bi bi-pencil-square" aria-hidden="true"></i>
+  </a>
+
+  <form method="post" action="payment-delete.php" class="d-inline"
+        onsubmit="return confirm('Delete this payment permanently? The loan balances will be recalculated.');">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+    <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+    <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete payment">
+      <i class="bi bi-trash" aria-hidden="true"></i>
+    </button>
+  </form>
     <a class="btn btn-outline-secondary btn-sm "
          href="loan-view.php?id=<?= (int) $payment['loan_id'] ?>">
         <i class="bi bi-cash-coin" aria-hidden="true"></i> Back to Loan

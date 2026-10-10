@@ -181,9 +181,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'The selected loan does not belong to the selected client.';
         } elseif (in_array($loan['status'], ['cleared','written_off'], true)) {
             $errors[] = 'This loan is already ' . $loan['status'] . ' and cannot receive payments.';
-        } elseif ($amountPaid > (float) $loan['balance'] + 0.001) {
-            $errors[] = 'Amount exceeds the outstanding balance of Ksh '
-                      . number_format((float) $loan['balance'], 2) . '.';
+        } elseif ((float) $loan['balance'] <= 0.009) {
+            $errors[] = 'This loan has no remaining balance and cannot receive payments.';
         }
     }
 
@@ -388,7 +387,7 @@ ob_start();
           <label class="form-label" for="amountPaid">Amount Paid (Ksh)</label>
           <input class="form-control" id="amountPaid" name="amountPaid" type="number"
                  min="1" step="0.01" required
-                 value="<?= htmlspecialchars($form['amountPaid'], ENT_QUOTES, 'UTF-8') ?>">
+                 value="<?= htmlspecialchars($form['balance'], ENT_QUOTES, 'UTF-8') ?>">
           <div class="invalid-feedback">Enter the amount paid.</div>
           <div class="form-text" id="balanceHint"></div>
         </div>
@@ -508,31 +507,33 @@ ob_start();
 
     $loan.disabled = false;
     $loan.innerHTML = '<option value="">Choose loan</option>';
-    matches.forEach(l => {
+        matches.forEach(l => {
+      const principalBal = parseFloat(l.principal_balance) || 0;
+      const interestBal  = parseFloat(l.interest_balance)  || 0;
+      const totalBal     = principalBal + interestBal;
+
       const opt = document.createElement('option');
       opt.value = l.id;
       opt.textContent = l.loan_code
         + ' — ' + (l.purpose || 'Loan')
-        + ' (Balance: ' + fmtKsh(l.balance) + ')';
-      opt.dataset.balance = l.balance;
+        + ' (Balance: ' + fmtKsh(totalBal) + ')';
+      opt.dataset.principal = principalBal;
+      opt.dataset.interest  = interestBal;
       if (String(l.id) === String(PRESELECTED_LOAN)) opt.selected = true;
       $loan.appendChild(opt);
     });
-
     $hint.textContent = matches.length + ' active loan(s) found.';
     updateBalanceHint();
   }
 
-  function updateBalanceHint() {
+      function updateBalanceHint() {
     const opt = $loan.options[$loan.selectedIndex];
     if (!opt || !opt.dataset.balance) {
       $bal.textContent = '';
-      $amount.removeAttribute('max');
       return;
     }
     const bal = parseFloat(opt.dataset.balance);
     $bal.textContent = 'Outstanding balance: ' + fmtKsh(bal);
-    $amount.max = bal;
   }
 
   $client.addEventListener('change', refreshLoans);

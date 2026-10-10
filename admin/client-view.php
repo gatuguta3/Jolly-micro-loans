@@ -43,7 +43,7 @@ $loans = [];
 $stmt = $conn->prepare(
     "SELECT id, loan_code, loan_category, date_issued, principal_amount,
             interest_rate, interest_amount, total_due,
-            balance, due_date, status, purpose
+            principal_balance, interest_balance, due_date, status, purpose
      FROM loans
      WHERE client_id = ?
      ORDER BY date_issued DESC"
@@ -353,6 +353,8 @@ ob_start();
                 <th scope="col">Client</th>
                 <th scope="col">Date Issued</th>
                 <th scope="col">Principal Amount</th>
+                <th scope="col">Principal balance</th>
+                <th scope="col">Interest balance</th>
                 <th scope="col">Amount Due</th>
                 <th scope="col">Due date</th>
                 <th scope="col">Status</th>
@@ -380,7 +382,7 @@ ob_start();
                   ?>
                   <tr>
                     <td>
-                      <span class="fw-semibold"><?= htmlspecialchars($l['loan_code'], ENT_QUOTES, 'UTF-8') ?></span>
+                      <span class="fw-semibold"><a href="loan-view.php?id=<?= (int) $l['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($l['loan_code']) ?></a></span>
                       <p class="text-muted small mb-0"><?= htmlspecialchars($loanType, ENT_QUOTES, 'UTF-8') ?></p>
                     </td>
                     <td>
@@ -396,7 +398,8 @@ ob_start();
                     </td>
                     <td><?= htmlspecialchars($issuedFmt) ?></td>
                     <td><?= client_ksh($l['principal_amount']) ?></td>
-                    <td><?= client_ksh($l['balance']) ?></td>
+                    <td><?= client_ksh($l['principal_balance']) ?></td>
+                    <td><?= client_ksh($l['interest_balance']) ?></td>
                     <td><?= htmlspecialchars($dueFmt) ?></td>
                     <td><span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($badgeLabel) ?></span></td>
                     <td class="text-end">

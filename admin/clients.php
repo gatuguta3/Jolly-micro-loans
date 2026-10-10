@@ -107,7 +107,7 @@ ob_start();
         <?php else: ?>
           <?php foreach ($clients as $c): ?>
             <tr>
-              <td><?= htmlspecialchars($c['client_code'], ENT_QUOTES, 'UTF-8') ?></td>
+              <td><a href="client-view.php?id=<?= (int) $c['id'] ?>" class="fw-semibold text-decoration-none"><?= htmlspecialchars($c['client_code']) ?></a></td>
               <td>
                 <div class="d-flex align-items-center gap-2">
                   <img class="avatar-img avatar-sm"

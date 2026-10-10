@@ -54,8 +54,8 @@ if (!isset($loanCategories)) {
 
 if (!isset($loanLimits)) {
     $loanLimits = [
-        'monthly' => 2,
-        'daily'   => 1,
+        'monthly' => 3,
+        'daily'   => 2,
         'boost'   => 0,
     ];
 }

@@ -58,9 +58,10 @@ if (!$client) {
 ---------------------------------------------------------------- */
 $loans = [];
 $stmt = $conn->prepare(
-    "SELECT id, loan_code, loan_category, date_issued, principal_amount,
-            interest_rate, interest_amount, total_due, amount_paid,
-            balance, due_date, status, purpose, notes, created_at
+    "SELECT id, loan_code, loan_category, date_issued, duration,
+            principal_amount, principal_balance,
+            interest_rate, interest_amount, interest_balance,
+            total_due, balance, due_date, status, purpose, notes, created_at
      FROM loans
      WHERE client_id = ?
      ORDER BY date_issued ASC, id ASC"
@@ -116,8 +117,12 @@ foreach ($loans as $l) {
     $totalPrincipal += (float) $l['principal_amount'];
     $totalInterest  += (float) $l['interest_amount'];
     $totalDue       += (float) $l['total_due'];
-    $totalPaid      += (float) $l['amount_paid'];
     $totalBalance   += (float) $l['balance'];
+
+    /* Amount paid = what's been knocked off principal + interest */
+    $paid = ((float) $l['principal_amount'] - (float) $l['principal_balance'])
+          + ((float) $l['interest_amount']  - (float) $l['interest_balance']);
+    $totalPaid += $paid;
 
     switch ($l['status']) {
         case 'active':    $countActive++;    break;
@@ -293,21 +298,18 @@ $clientRows = [
 
 $rowY = $pdf->GetY();
 foreach ($clientRows as $i => $r) {
-    $col = $i % 2;                     // 0 = left, 1 = right
+    $col = $i % 2;
     $x   = $col === 0 ? 15 : 108;
 
-    /* New line every two entries */
     if ($col === 0 && $i > 0) {
         $rowY += 6;
     }
 
-    /* Label */
     $pdf->SetFont('Arial', '', 8);
     $pdf->SetTextColor(107, 114, 128);
     $pdf->SetXY($x, $rowY);
     $pdf->Cell(28, 5, $r[0], 0, 0);
 
-    /* Value */
     $pdf->SetFont('Arial', 'B', 8);
     $pdf->SetTextColor(17, 24, 39);
     $pdf->SetX($x + 28);
@@ -349,11 +351,11 @@ $cardsRow1 = [
     ['TOTAL LOANS',      (string) count($loans)],
     ['TOTAL PRINCIPAL',  cr_ksh($totalPrincipal)],
     ['TOTAL PAID',       cr_ksh($totalPaid)],
-    ['OUTSTANDING BAL.', cr_ksh($totalBalance)],
+    
 ];
-$cardW  = 43;
+$cardW   = 43;
 $cardGap = 2;
-$cardY  = $pdf->GetY();
+$cardY   = $pdf->GetY();
 
 foreach ($cardsRow1 as $i => $c) {
     $x = 15 + $i * ($cardW + $cardGap);
@@ -436,9 +438,14 @@ if (empty($loans)) {
     foreach ($loans as $loan) {
         $loanPayments = $paymentsByLoan[(int) $loan['id']] ?? [];
 
+        /* Derive what's been repaid on this loan */
+        $loanPrincipalPaid = round((float) $loan['principal_amount'] - (float) $loan['principal_balance'], 2);
+        $loanInterestPaid  = round((float) $loan['interest_amount']  - (float) $loan['interest_balance'],  2);
+        $loanTotalPaid     = round($loanPrincipalPaid + $loanInterestPaid, 2);
+
         /* ---- Estimate height of this loan block ----
            If it won't fit on the current page, start a new page. */
-        $estimatedHeight = 58;                // header + meta
+        $estimatedHeight = 67;                // header + 3-row meta grid
         if (!empty($loanPayments)) {
             $estimatedHeight += 10 + count($loanPayments) * 6 + 8;
         }
@@ -481,16 +488,22 @@ if (empty($loans)) {
         $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
         $pdf->Ln(2);
 
-        /* ---- Loan meta grid (4 columns x 2 rows) ---- */
+        /* ---- Loan meta grid (4 columns × 3 rows) ---- */
         $metaRows = [
-            ['Date Issued',     cr_date($loan['date_issued'])],
-            ['Due Date',        cr_date($loan['due_date'])],
-            ['Principal',       cr_ksh($loan['principal_amount'])],
-            ['Interest Rate',   number_format((float) $loan['interest_rate'], 2) . '%'],
-            ['Interest Amount', cr_ksh($loan['interest_amount'])],
-            ['Total Due',       cr_ksh($loan['total_due'])],
-            ['Amount Paid',     cr_ksh($loan['amount_paid'])],
-            ['Balance',         cr_ksh($loan['balance'])],
+            ['Date Issued',       cr_date($loan['date_issued'])],
+            ['Due Date',          cr_date($loan['due_date'])],
+            ['Principal',         cr_ksh($loan['principal_amount'])],
+            ['Interest Rate',     number_format((float) $loan['interest_rate'], 2) . '%'],
+
+            ['Interest Billed',   cr_ksh($loan['interest_amount'])],
+            ['Total Due',         cr_ksh($loan['total_due'])],
+            ['Total Paid',        cr_ksh($loanTotalPaid)],
+            ['Balance',           cr_ksh($loan['balance'])],
+
+            ['Principal Balance', cr_ksh($loan['principal_balance'])],
+            ['Interest Balance',  cr_ksh($loan['interest_balance'])],
+            ['Principal Repaid',  cr_ksh($loanPrincipalPaid)],
+            ['Interest Repaid',   cr_ksh($loanInterestPaid)],
         ];
 
         $metaRowY = $pdf->GetY();
@@ -543,11 +556,11 @@ if (empty($loans)) {
                 if ($fill) $pdf->SetFillColor(249, 250, 251);
 
                 $pdf->SetX(15);
-                $pdf->Cell(40, 5, cr_safe($p['payment_code']),                        0, 0, 'L', $fill);
-                $pdf->Cell(35, 5, cr_date($p['payment_date']),                        0, 0, 'L', $fill);
-                $pdf->Cell(40, 5, cr_safe(cr_mode_label($p['mode_of_payment'])),      0, 0, 'L', $fill);
-                $pdf->Cell(30, 5, cr_safe($p['reference_number'] ?? '-'),             0, 0, 'L', $fill);
-                $pdf->Cell(35, 5, cr_ksh($p['amount_paid']),                          0, 1, 'R', $fill);
+                $pdf->Cell(40, 5, cr_safe($p['payment_code']),                   0, 0, 'L', $fill);
+                $pdf->Cell(35, 5, cr_date($p['payment_date']),                   0, 0, 'L', $fill);
+                $pdf->Cell(40, 5, cr_safe(cr_mode_label($p['mode_of_payment'])), 0, 0, 'L', $fill);
+                $pdf->Cell(30, 5, cr_safe($p['reference_number'] ?? '-'),        0, 0, 'L', $fill);
+                $pdf->Cell(35, 5, cr_ksh($p['amount_paid']),                     0, 1, 'R', $fill);
 
                 $subtotal += (float) $p['amount_paid'];
                 $idx++;

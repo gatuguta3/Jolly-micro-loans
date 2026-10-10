@@ -325,7 +325,7 @@ ob_start();
                       ?: ucwords(str_replace('_', ' ', $l['loan_category'] ?? 'loan')) . ' Loan';
                 ?>
                 <tr>
-                  <td><?= htmlspecialchars($l['loan_code'], ENT_QUOTES, 'UTF-8') ?></td>
+                  <td><a href="loan-view.php?id=<?= (int) $l['id'] ?>" class="fw-semibold text-decoration-none"><?= htmlspecialchars($l['loan_code']) ?></a></td>
                   <td>
                     <div class="d-flex align-items-center gap-2">
                       <img class="avatar-img avatar-sm"

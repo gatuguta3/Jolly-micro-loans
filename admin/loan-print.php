@@ -41,8 +41,9 @@ if ($loanId <= 0) {
 $stmt = $conn->prepare(
     "SELECT
         l.id, l.loan_code, l.loan_category, l.date_issued, l.duration,
-        l.principal_amount, l.interest_rate, l.interest_amount,
-        l.total_due, l.amount_paid, l.balance, l.due_date, l.status,
+        l.principal_amount, l.principal_balance,
+        l.interest_rate, l.interest_amount, l.interest_balance,
+        l.total_due, l.balance, l.due_date, l.status,
         l.purpose, l.notes,
         c.id         AS client_id,
         c.client_code,
@@ -70,7 +71,7 @@ if (!$loan) {
 }
 
 /* ----------------------------------------------------------------
-   FETCH GUARANTORS
+   FETCH GUARANTORS (via join table if it exists)
 ---------------------------------------------------------------- */
 $guarantors = [];
 $hasJoin = $conn->query("SHOW TABLES LIKE 'loan_guarantors'");
@@ -109,6 +110,19 @@ if ($stmt) {
     while ($r = $res->fetch_assoc()) $payments[] = $r;
     $stmt->close();
 }
+
+/* ----------------------------------------------------------------
+   DERIVED VALUES
+
+   With the new schema, "amount paid" is what has been knocked off
+   the original principal + interest:
+       principal repaid = principal_amount  - principal_balance
+       interest  repaid = interest_amount   - interest_balance
+       total repaid     = principal repaid + interest repaid
+---------------------------------------------------------------- */
+$principalPaid = round((float) $loan['principal_amount'] - (float) $loan['principal_balance'], 2);
+$interestPaid  = round((float) $loan['interest_amount']  - (float) $loan['interest_balance'],  2);
+$totalPaid     = round($principalPaid + $interestPaid, 2);
 
 /* ----------------------------------------------------------------
    HELPERS (ASCII-safe — FPDF uses ISO-8859-1)
@@ -153,13 +167,11 @@ function lp_category_label(string $category): string {
 /* FPDF has no native "clean" text function — strip anything outside Latin-1 */
 function lp_safe(?string $s): string {
     $s = (string) $s;
-    /* Replace common unicode punctuation with ASCII equivalents */
     $s = str_replace(
         ["\xE2\x80\x94", "\xE2\x80\x93", "\xE2\x80\xA6", "\xC2\xB7", "\xE2\x80\xA2"],
         ['-', '-', '...', '-', '-'],
         $s
     );
-    /* Replace any remaining non-Latin-1 chars with ? */
     return preg_replace('/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/', '?', $s);
 }
 
@@ -179,7 +191,6 @@ foreach ($payments as $p) $paySum += (float) $p['amount_paid'];
    BUILD THE PDF
 ---------------------------------------------------------------- */
 
-/* Custom class so we can add a footer to every page */
 class LoanStatementPDF extends FPDF
 {
     public $footerLeft  = '';
@@ -187,10 +198,8 @@ class LoanStatementPDF extends FPDF
 
     function Footer()
     {
-        /* Position at 15 mm from bottom */
         $this->SetY(-15);
 
-        /* Separator line */
         $this->SetDrawColor(229, 231, 235);
         $this->SetLineWidth(0.2);
         $this->Line(15, $this->GetY(), 195, $this->GetY());
@@ -294,7 +303,6 @@ $colLeftX  = 15;
 $colRightX = 108;
 $colWidth  = 87;
 
-/* Section title helper (closure-like via function) */
 function section_title(FPDF $pdf, float $x, float $y, float $w, string $title) {
     $pdf->SetXY($x, $y);
     $pdf->SetFont('Arial', 'B', 8);
@@ -331,7 +339,6 @@ $clientRows = [
 ];
 foreach ($clientRows as $r) {
     info_row($pdf, $colLeftX, $rowY, $colWidth, $r[0], lp_safe($r[1]));
-    /* dotted underline */
     $pdf->SetDrawColor(229, 231, 235);
     $pdf->Line($colLeftX, $rowY + 5, $colLeftX + $colWidth, $rowY + 5);
     $rowY += 5.5;
@@ -360,22 +367,48 @@ foreach ($termRows as $r) {
 $pdf->SetY(84);
 
 /* ================================================================
-   FINANCIAL SUMMARY TABLE
+   FINANCIAL SUMMARY
 ================================================================ */
 
 section_title($pdf, 15, $pdf->GetY(), 180, 'Financial Summary');
 $pdf->Ln(6);
 
+/* Section sub-heading helper */
+$subheading = function (FPDF $pdf, string $text) {
+    $pdf->SetX(15);
+    $pdf->SetFont('Arial', 'I', 8);
+    $pdf->SetTextColor(107, 114, 128);
+    $pdf->Cell(180, 6, $text, 0, 1);
+};
+
+/* Summary rows: [label, value, highlight, is_subheading] */
 $summaryRows = [
-    ['Principal Amount',      lp_ksh($loan['principal_amount']), false],
-    ['Interest Amount',       lp_ksh($loan['interest_amount']),  false],
-    ['Total Due',             lp_ksh($loan['total_due']),        false],
-    ['Amount Paid',           lp_ksh($loan['amount_paid']),      false],
-    ['Outstanding Balance',   lp_ksh($loan['balance']),          true],
+    ['Billed', null, false, true],
+
+    ['Principal Amount',      lp_ksh($loan['principal_amount']),  false, false],
+    ['Interest Billed',       lp_ksh($loan['interest_amount']),   false, false],
+    ['Total Due',             lp_ksh($loan['total_due']),         false, false],
+
+    ['Paid', null, false, true],
+
+    ['Principal Repaid',      lp_ksh($principalPaid),             false, false],
+    ['Interest Repaid',       lp_ksh($interestPaid),              false, false],
+    ['Total Amount Paid',     lp_ksh($totalPaid),                 false, false],
+
+    ['Outstanding', null, false, true],
+
+    ['Principal Balance',     lp_ksh($loan['principal_balance']), false, false],
+    ['Interest Balance',      lp_ksh($loan['interest_balance']),  false, false],
+    
 ];
 
 foreach ($summaryRows as $sr) {
-    [$label, $value, $highlight] = $sr;
+    [$label, $value, $highlight, $isSubheading] = $sr;
+
+    if ($isSubheading) {
+        $subheading($pdf, $label);
+        continue;
+    }
 
     $y = $pdf->GetY();
 
@@ -409,13 +442,12 @@ if (!empty($guarantors)) {
     section_title($pdf, 15, $pdf->GetY(), 180, 'Guarantor' . (count($guarantors) > 1 ? 's' : ''));
     $pdf->Ln(6);
 
-    /* Table header */
     $pdf->SetFillColor(17, 24, 39);
     $pdf->SetTextColor(255, 255, 255);
     $pdf->SetFont('Arial', 'B', 8);
     $pdf->SetX(15);
     $pdf->Cell(60, 7, 'Name',       0, 0, 'L', true);
-    $pdf->Cell(35, 7, 'ID Number',  0, 0, 'L', true);
+   
     $pdf->Cell(40, 7, 'Phone',      0, 0, 'L', true);
     $pdf->Cell(45, 7, 'Email',      0, 1, 'L', true);
 
@@ -424,12 +456,10 @@ if (!empty($guarantors)) {
     $rowIdx = 0;
     foreach ($guarantors as $g) {
         $fill = ($rowIdx % 2 === 1);
-        if ($fill) {
-            $pdf->SetFillColor(249, 250, 251);
-        }
+        if ($fill) $pdf->SetFillColor(249, 250, 251);
         $pdf->SetX(15);
         $pdf->Cell(60, 6, lp_safe(substr($g['name'], 0, 40)), 0, 0, 'L', $fill);
-        $pdf->Cell(35, 6, lp_safe($g['identification_number'] ?? '-'), 0, 0, 'L', $fill);
+        
         $pdf->Cell(40, 6, lp_safe($g['phone'] ?? '-'), 0, 0, 'L', $fill);
         $pdf->Cell(45, 6, lp_safe(substr($g['email'] ?? '-', 0, 40)), 0, 1, 'L', $fill);
         $rowIdx++;
@@ -458,9 +488,9 @@ if ($payCount === 0) {
     $cardW = 58;
     $gap   = 3;
     $cards = [
-        ['Payments',   (string) $payCount],
-        ['Total Paid', lp_ksh($paySum)],
-        ['Balance',    lp_ksh($loan['balance'])],
+        ['Payments',          (string) $payCount],
+        ['Total Paid',        lp_ksh($paySum)],
+        
     ];
 
     $startX = 15;

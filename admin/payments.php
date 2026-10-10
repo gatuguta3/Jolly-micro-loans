@@ -9,6 +9,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 /* ----------------------------------------------------------------
    AGGREGATE STATS FOR CARDS
 ---------------------------------------------------------------- */
@@ -259,11 +263,11 @@ ob_start();
               [$modeClass, $modeLabel] = pay_mode_badge($p['mode_of_payment']);
 
               $clientPhoto = !empty($p['client_photo'])
-                  ? '../assets/client-attachments/' . rawurlencode($p['client_photo'])
+                  ? '/assets/client-attachments/' . rawurlencode($p['client_photo'])
                   : pay_avatar_svg($p['client_name']);
             ?>
             <tr>
-              <td><?= htmlspecialchars($p['payment_code'], ENT_QUOTES, 'UTF-8') ?></td>
+              <td><a href="payment-view.php?id=<?= (int) $p['id'] ?>" class="fw-semibold text-decoration-none"><?= htmlspecialchars($p['payment_code']) ?></a></td>
               <td>
                 <div class="d-flex align-items-center gap-2">
                   <img class="avatar-img avatar-sm"
@@ -275,13 +279,32 @@ ob_start();
                   </div>
                 </div>
               </td>
-              <td><?= htmlspecialchars($p['loan_code'], ENT_QUOTES, 'UTF-8') ?></td>
+             <td>
+                <a href="loan-view.php?id=<?= (int) $p['loan_id'] ?>" class="text-decoration-none">
+                  <?= htmlspecialchars($p['loan_code'], ENT_QUOTES, 'UTF-8') ?>
+                </a>
+              </td>
               <td><?= pay_ksh($p['amount_paid']) ?></td>
               <td><?= htmlspecialchars(pay_fmt_date($p['payment_date'])) ?></td>
               <td><span class="badge <?= $modeClass ?>"><?= htmlspecialchars($modeLabel) ?></span></td>
               <td class="text-end">
-                <a class="btn btn-light btn-sm" href="payment-view.php?id=<?= (int) $p['id'] ?>">View</a>
-              </td>
+                  <a class="btn btn-light btn-sm" href="payment-view.php?id=<?= (int) $p['id'] ?>">View</a>
+
+                  <a class="btn btn-outline-primary btn-sm"
+                    href="payment-edit.php?id=<?= (int) $p['id'] ?>"
+                    title="Edit payment">
+                    <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                  </a>
+
+                  <form method="post" action="payment-delete.php" class="d-inline"
+                        onsubmit="return confirm('Delete this payment permanently? The loan balances will be recalculated.');">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete payment">
+                      <i class="bi bi-trash" aria-hidden="true"></i>
+                    </button>
+                  </form>
+                </td>
             </tr>
           <?php endforeach; ?>
         <?php endif; ?>

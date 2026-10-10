@@ -306,7 +306,7 @@ ob_start();
         <span class="metric-icon"><i class="bi bi-currency-dollar" aria-hidden="true"></i></span>
       </div>
       <div class="metric-value"><?= d_ksh($top['total_principal']) ?></div>
-      <div class="metric-meta  h1">
+      <div class="metric-meta ">
         <span class=" <?= $deltaPrincipal['delta'] >= 0 ? 'text-success' : 'text-danger' ?>">
           <?= ($deltaPrincipal['delta'] >= 0 ? '+' : '') . d_pct($deltaPrincipal['delta']) ?>
         </span>

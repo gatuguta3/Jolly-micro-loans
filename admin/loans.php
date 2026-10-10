@@ -31,14 +31,13 @@ if (session_status() === PHP_SESSION_NONE) {
    The DB auto-recomputes total_due and balance after each update.
 
    Only monthly, active/overdue loans with a positive balance are touched.
-================================================================ */
-function accrue_monthly_interest(mysqli $conn, array $categories): int {
+================================================================ */function accrue_monthly_interest(mysqli $conn, array $categories): int {
     $tiers = $categories['monthly']['tiers'] ?? [];
     if (empty($tiers)) return 0;
 
     $sql = "SELECT id, date_issued, due_date,
                    principal_amount, principal_balance,
-                   interest_rate, interest_balance,
+                   interest_rate, interest_amount, interest_balance,
                    last_accrual_date
             FROM loans
             WHERE loan_category = 'monthly'
@@ -49,7 +48,11 @@ function accrue_monthly_interest(mysqli $conn, array $categories): int {
     if (!$res) return 0;
 
     $update = $conn->prepare(
-        "UPDATE loans SET interest_balance = ?, last_accrual_date = ? WHERE id = ?"
+        "UPDATE loans
+         SET interest_amount  = ?,
+             interest_balance = ?,
+             last_accrual_date = ?
+         WHERE id = ?"
     );
     if (!$update) { $res->free(); return 0; }
 
@@ -60,13 +63,11 @@ function accrue_monthly_interest(mysqli $conn, array $categories): int {
 
         $principal_amount  = (float) $loan['principal_amount'];
         $principal_balance = (float) $loan['principal_balance'];
-        $interest_balance  = (float) $loan['interest_balance'];
+        $interest_amount   = (float) $loan['interest_amount'];   // running total billed
+        $interest_balance  = (float) $loan['interest_balance'];  // still owed
 
-        /* No outstanding principal → nothing to charge */
         if ($principal_balance <= 0) continue;
 
-        /* Tier rate — determined by the ORIGINAL principal,
-           not the current balance. Once set, the tier stays fixed. */
         $baseRate = null;
         foreach ($tiers as $t) {
             if ($principal_amount >= $t['min'] && $principal_amount <= $t['max']) {
@@ -76,7 +77,6 @@ function accrue_monthly_interest(mysqli $conn, array $categories): int {
         }
         if ($baseRate === null) continue;
 
-        /* Checkpoint — where we last billed from */
         if (!empty($loan['last_accrual_date'])) {
             $checkpoint = new DateTime($loan['last_accrual_date']);
         } else {
@@ -84,32 +84,34 @@ function accrue_monthly_interest(mysqli $conn, array $categories): int {
             $checkpoint->modify('+1 month');
         }
 
-        /* Freeze — stop accruing at due + 3 months */
         $due    = new DateTime($loan['due_date']);
         $freeze = (clone $due)->modify('+3 months');
         $cap    = $today < $freeze ? $today : $freeze;
 
-        /* Walk month by month */
-        $monthsBilled = 0;
+        /* Walk month by month, tracking how much is added this pass */
+        $interestAdded = 0.0;
+        $monthsBilled  = 0;
 
         while (true) {
-            $next = (clone $checkpoint)->modify('+1 month');
-            if ($next > $cap) break;
+            if ($checkpoint > $cap) break;
 
-            /* Interest for one month, on the OUTSTANDING PRINCIPAL */
-            $monthlyInterest   = round($principal_balance * $baseRate / 100, 2);
+            $monthlyInterest = round($principal_balance * $baseRate / 100, 2);
             $interest_balance += $monthlyInterest;
+            $interestAdded    += $monthlyInterest;
 
-            $checkpoint = $next;
+            $checkpoint = (clone $checkpoint)->modify('+1 month');
             $monthsBilled++;
         }
 
         if ($monthsBilled === 0) continue;
 
+        /* Add the same amount to the running total billed */
+        $interest_amount = round($interest_amount + $interestAdded, 2);
+
         $id      = (int) $loan['id'];
         $lastStr = $checkpoint->format('Y-m-d');
 
-        $update->bind_param("dsi", $interest_balance, $lastStr, $id);
+        $update->bind_param("ddsi", $interest_amount, $interest_balance, $lastStr, $id);
         $update->execute();
         $changed++;
     }
@@ -125,6 +127,104 @@ accrue_monthly_interest($conn, $loanCategories);
 /* ----------------------------------------------------------------
    Loan functions and helpers
 ---------------------------------------------------------------- */
+
+
+
+/* ================================================================
+   STATUS ENGINE — active / overdue / defaulted / written-off
+================================================================ */
+
+function add_duration_units(DateTime $date, string $category, int $units): DateTime {
+    $out = clone $date;
+
+    if ($category === 'monthly') {
+        $out->modify('+' . max(0, $units) . ' months');
+    } else {
+        $out->modify('+' . max(0, $units) . ' days');
+    }
+
+    return $out;
+}
+
+function compute_default_date(array $loan): DateTime {
+    $category = $loan['loan_category'] ?? 'monthly';
+    $dueDate  = new DateTime($loan['due_date']);
+
+    /* Defaulted at due_date + 3 */
+    return add_duration_units($dueDate, $category, 3);
+}
+
+function compute_writeoff_date(array $loan): DateTime {
+    $category = $loan['loan_category'] ?? 'monthly';
+    $dueDate  = new DateTime($loan['due_date']);
+
+    /* Written off at due_date + 6 */
+    return add_duration_units($dueDate, $category, 6);
+}
+
+function determine_loan_status(array $loan, DateTime $today): string {
+    $current  = $loan['status'];
+    $category = $loan['loan_category'] ?? 'monthly';
+
+    /* Terminal states */
+    if ($current === 'written_off') return 'written_off';
+    if ($current === 'cleared')     return 'cleared';
+
+    /* Cleared wins */
+    $balance = (float) ($loan['balance'] ?? 0);
+    if ($balance <= 0.009) return 'cleared';
+
+    $dueDate = new DateTime($loan['due_date']);
+
+    /* Active until the due date */
+    if ($today < $dueDate) return 'active';
+
+    /* Past due — walk the thresholds */
+    $defaultDate  = compute_default_date($loan);     // due + 3
+    $writeOffDate = compute_writeoff_date($loan);    // due + 6
+
+    if ($today >= $writeOffDate) return 'written_off';
+    if ($today >= $defaultDate)  return 'defaulted';
+
+    return 'overdue';
+}
+
+function refresh_loan_statuses(mysqli $conn): int {
+    $sql = "SELECT id, loan_category, date_issued, due_date, duration,
+                   principal_amount, amount_paid, balance, status
+            FROM loans
+            WHERE status NOT IN ('written_off','cleared')";
+
+    $res = $conn->query($sql);
+    if (!$res) return 0;
+
+    $today   = new DateTime('today');
+    $updates = [];
+
+    while ($loan = $res->fetch_assoc()) {
+        $newStatus = determine_loan_status($loan, $today);
+        if ($newStatus !== $loan['status']) {
+            $updates[] = [(int) $loan['id'], $newStatus];
+        }
+    }
+    $res->free();
+
+    if (empty($updates)) return 0;
+
+    $stmt = $conn->prepare("UPDATE loans SET status = ? WHERE id = ?");
+    if (!$stmt) return 0;
+
+    foreach ($updates as $u) {
+        $stmt->bind_param("si", $u[1], $u[0]);
+        $stmt->execute();
+    }
+    $stmt->close();
+
+    return count($updates);
+}
+
+/* ---------- RUN STATUS REFRESH ---------- */
+refresh_loan_statuses($conn);
 
 
 
@@ -174,7 +274,8 @@ $res = $conn->query(
         l.interest_rate,
         l.interest_amount,
         l.total_due,
-        l.balance,
+        l.principal_balance,
+        l.interest_balance,
         l.due_date,
         l.status,
         c.id         AS client_id,
@@ -348,7 +449,8 @@ ob_start();
           <th scope="col">Client</th>
           <th scope="col">Date Issued</th>
           <th scope="col">Principal Amount</th>
-          <th scope="col">Amount Due</th>
+          <th scope="col">Principal balance</th>
+          <th scope="col">Interest balance</th>
           <th scope="col">Due date</th>
           <th scope="col">Status</th>
           <th scope="col" class="text-end">Action</th>
@@ -376,7 +478,7 @@ ob_start();
             ?>
             <tr>
               <td>
-                <span class="fw-semibold"><?= htmlspecialchars($l['loan_code'], ENT_QUOTES, 'UTF-8') ?></span>
+                <span class="fw-semibold"><a href="loan-view.php?id=<?= (int) $l['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($l['loan_code']) ?></a></span>
                 <p class="text-muted small mb-0"><?= htmlspecialchars(category_label($l['loan_category'] ?? 'monthly'), ENT_QUOTES, 'UTF-8') ?></p>
               </td>
               <td>
@@ -392,17 +494,34 @@ ob_start();
               </td>
               <td><?= htmlspecialchars($issuedFmt) ?></td>
               <td><?= ksh((float) $l['principal_amount']) ?></td>
-              <td><?= ksh((float) $l['balance']) ?></td>
+              <td><?= ksh((float) $l['principal_balance']) ?></td>
+              <td><?= ksh((float) $l['interest_balance']) ?></td>
               <td><?= htmlspecialchars($dueFmt) ?></td>
               <td><span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($badgeLabel) ?></span></td>
               <td class="text-end">
                 <a class="btn btn-light btn-sm" href="loan-view.php?id=<?= (int) $l['id'] ?>">View</a>
+
+                <a class="btn btn-outline-primary btn-sm"
+                  href="loan-edit.php?id=<?= (int) $l['id'] ?>"
+                  title="Edit loan">
+                  <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                </a>
+
                 <a class="btn btn-outline-secondary btn-sm"
-                   href="loan-print.php?id=<?= (int) $l['id'] ?>"
-                   target="_blank" rel="noopener"
-                   title="Print statement">
+                  href="loan-print.php?id=<?= (int) $l['id'] ?>"
+                  target="_blank" rel="noopener"
+                  title="Print statement">
                   <i class="bi bi-printer" aria-hidden="true"></i>
                 </a>
+
+                <form method="post" action="loan-delete.php" class="d-inline"
+                      onsubmit="return confirm('Delete this loan permanently? This cannot be undone.');">
+                  <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                  <input type="hidden" name="id" value="<?= (int) $l['id'] ?>">
+                  <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete loan">
+                    <i class="bi bi-trash" aria-hidden="true"></i>
+                  </button>
+                </form>
               </td>
             </tr>
           <?php endforeach; ?>

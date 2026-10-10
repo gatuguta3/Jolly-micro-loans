@@ -189,6 +189,29 @@ ob_start();
     <a class="btn btn-outline-secondary btn-sm" href="loans.php">
       <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to loans
     </a>
+
+    <a class="btn btn-outline-primary btn-sm"
+                  href="loan-edit.php?id=<?= (int) $loan['id'] ?>"
+                  title="Edit loan">
+                  <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                </a>
+
+       <form method="post" action="loan-delete.php" class="d-inline"
+                      onsubmit="return confirm('Delete this loan permanently? This cannot be undone.');">
+                  <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                  <input type="hidden" name="id" value="<?= (int) $loan['id'] ?>">
+                  <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete loan">
+                    <i class="bi bi-trash" aria-hidden="true"></i>
+                  </button>
+                </form>
+
+
+     <a class="btn btn-outline-secondary btn-sm"
+        href="loan-print.php?id=<?= (int) $loan['id'] ?>"
+        target="_blank" rel="noopener">
+        <i class="bi bi-printer" aria-hidden="true"></i> Print
+      </a>
+
     <a class="btn btn-outline-secondary btn-sm" href="client-view.php?id=<?= (int) $loan['client_id'] ?>">
       <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to client
     </a>
@@ -247,7 +270,10 @@ ob_start();
           </h2>
           <p class="text-muted mb-0">Loan ID: <?= htmlspecialchars($loan['loan_code'], ENT_QUOTES, 'UTF-8') ?></p>
         </div>
+
+
         <a class="btn btn-primary btn-sm" href="loan-edit.php?id=<?= (int) $loan['id'] ?>">Edit Loan</a>
+        
       </div>
 
       <div class="row g-3">
@@ -287,12 +313,7 @@ ob_start();
             <strong><?= lv_ksh($loan['amount_paid']) ?></strong>
           </div>
         </div>
-        <div class="col-md-6">
-          <div class="mini-card">
-            <span>Balance</span>
-            <strong><?= lv_ksh($loan['balance']) ?></strong>
-          </div>
-        </div>
+        
         <div class="col-md-6">
           <div class="mini-card">
             <span>Principal Balance</span>
@@ -453,7 +474,7 @@ ob_start();
                 ?>
                 <tr>
                   <td>
-                    <span class="fw-semibold"><?= htmlspecialchars($p['payment_code'], ENT_QUOTES, 'UTF-8') ?></span>
+                    <a href="payment-view.php?id=<?= (int) $p['id'] ?>" class="fw-semibold text-decoration-none"><?= htmlspecialchars($p['payment_code']) ?></a>
                     <?php if (!empty($p['reference_number'])): ?>
                       <p class="text-muted small mb-0"><?= htmlspecialchars($p['reference_number'], ENT_QUOTES, 'UTF-8') ?></p>
                     <?php endif; ?>
@@ -476,6 +497,20 @@ ob_start();
                   <td class="text-end">
                     <a class="btn btn-light btn-sm"
                        href="payment-view.php?id=<?= (int) $p['id'] ?>">View</a>
+                        <a class="btn btn-outline-primary btn-sm"
+                    href="payment-edit.php?id=<?= (int) $p['id'] ?>"
+                    title="Edit payment">
+                    <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                  </a>
+
+                  <form method="post" action="payment-delete.php" class="d-inline"
+                        onsubmit="return confirm('Delete this payment permanently? The loan balances will be recalculated.');">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete payment">
+                      <i class="bi bi-trash" aria-hidden="true"></i>
+                    </button>
+                  </form>
                   </td>
                 </tr>
               <?php endforeach; ?>

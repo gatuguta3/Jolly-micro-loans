@@ -229,7 +229,7 @@ ob_start();
               }
             ?>
             <tr>
-              <td><?= (int) $g['id'] ?></td>
+              <td><a href="guarantor-view.php?id=<?= (int) $g['id'] ?>" class="fw-semibold text-decoration-none"><?= (int) $g['id'] ?></a></td>
               <td>
                 <div class="d-flex align-items-center gap-2">
                   <?php if ($photoIsImage): ?>
