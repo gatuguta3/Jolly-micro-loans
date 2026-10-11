@@ -103,6 +103,10 @@ ob_start();
     <a class="btn btn-primary btn-sm" href="guarantor-registration.php">
       <i class="bi bi-person-plus" aria-hidden="true"></i> Add Guarantor
     </a>
+
+    <a class="btn btn-primary btn-sm" href="chama-remittance.php">
+        <i class="bi bi-cash-stack" aria-hidden="true"></i> Chama remmitance
+      </a>
   </div>
 </div>
 

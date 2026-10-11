@@ -31,7 +31,8 @@ if (session_status() === PHP_SESSION_NONE) {
    The DB auto-recomputes total_due and balance after each update.
 
    Only monthly, active/overdue loans with a positive balance are touched.
-================================================================ */function accrue_monthly_interest(mysqli $conn, array $categories): int {
+================================================================ */
+function accrue_monthly_interest(mysqli $conn, array $categories): int {
     $tiers = $categories['monthly']['tiers'] ?? [];
     if (empty($tiers)) return 0;
 
@@ -228,6 +229,12 @@ refresh_loan_statuses($conn);
 
 
 
+/* ----------------------------------------------------------------
+   Chama remitance functions
+---------------------------------------------------------------- */
+
+
+
 
 /* ----------------------------------------------------------------
    AGGREGATE STATS FOR CARDS
@@ -345,9 +352,9 @@ ob_start();
     <button class="btn btn-outline-secondary btn-sm" type="button">
       <i class="bi bi-download" aria-hidden="true"></i> Export
     </button>
-    <button class="btn btn-primary btn-sm" type="button">
-      <i class="bi bi-file-earmark-plus" aria-hidden="true"></i> Create Report
-    </button>
+    <a class="btn btn-primary btn-sm" href="chama-remittance.php">
+        <i class="bi bi-cash-stack" aria-hidden="true"></i> Chama remmitance
+      </a>
   </div>
 </div>
 
@@ -432,6 +439,14 @@ ob_start();
                placeholder="Search loans..."
                style="max-width: 220px;">
       </div>
+      <select class="form-select form-select-sm" id="statusFilter" style="max-width: 160px;">
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="overdue">Overdue</option>
+        <option value="defaulted">Defaulted</option>
+        <option value="cleared">Cleared</option>
+        <option value="written_off">Written Off</option>
+      </select>
       <button class="btn btn-outline-secondary btn-sm" type="button">
         <i class="bi bi-download" aria-hidden="true"></i> Export
       </button>
@@ -536,6 +551,7 @@ ob_start();
 (() => {
   /* Client-side search filter for the loans table */
   const $search = document.getElementById('loanSearch');
+  const $filter = document.getElementById('statusFilter');
   const $table  = document.getElementById('clientLoansTable');
   if (!$search || !$table) return;
 
@@ -545,6 +561,16 @@ ob_start();
       row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
     });
   });
+  const applyFilters = () => {
+    const q      = ($search ? $search.value : '').trim().toLowerCase();
+    const status = ($filter ? $filter.value : '').toLowerCase();
+    $table.querySelectorAll('tbody tr').forEach(row => {
+      const rowStatus = row.getAttribute('data-status') || '';
+      row.style.display = (!q || row.textContent.toLowerCase().includes(q)) && (!status || rowStatus === status) ? '' : 'none';
+    });
+  };
+  $filter.addEventListener('change', applyFilters);
+  $search.addEventListener('input', applyFilters);
 })();
 </script>
 

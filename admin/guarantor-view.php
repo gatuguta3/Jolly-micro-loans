@@ -84,6 +84,66 @@ foreach ($loans as $l) {
     if (in_array($l['status'], ['active','overdue'], true)) $activeCount++;
 }
 
+
+/* ----------------------------------------------------------------
+   FETCH CHAMA REMITTANCES (only when guarantor is a chama)
+---------------------------------------------------------------- */
+$remittances = [];
+$remittanceTotals = [
+    'total'         => 0.0,
+    'total_paid'    => 0.0,
+    'total_pending' => 0.0,
+    'count_paid'    => 0,
+    'count_pending' => 0,
+    'count_total'   => 0,
+];
+
+$isChama = ($guarantor['type'] === 'chama');
+
+if ($isChama) {
+    $stmt = $conn->prepare(
+        "SELECT
+            cr.id,
+            cr.loan_id,
+            cr.base_amount,
+            cr.rate,
+            cr.remittance_amount,
+            cr.status,
+            cr.due_date,
+            cr.paid_date,
+            cr.reference_number,
+            cr.remarks,
+            cr.created_at,
+            l.loan_code,
+            c.full_name AS client_name,
+            c.email     AS client_email
+         FROM chama_remittances cr
+         INNER JOIN loans   l ON l.id = cr.loan_id
+         INNER JOIN clients c ON c.id = l.client_id
+         WHERE cr.guarantor_id = ?
+         ORDER BY cr.created_at DESC"
+    );
+    $stmt->bind_param("i", $guarantorId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) $remittances[] = $r;
+    $stmt->close();
+
+    foreach ($remittances as $r) {
+        $amt = (float) $r['remittance_amount'];
+        $remittanceTotals['total'] += $amt;
+        $remittanceTotals['count_total']++;
+
+        if ($r['status'] === 'paid') {
+            $remittanceTotals['total_paid'] += $amt;
+            $remittanceTotals['count_paid']++;
+        } elseif ($r['status'] === 'pending') {
+            $remittanceTotals['total_pending'] += $amt;
+            $remittanceTotals['count_pending']++;
+        }
+    }
+}
+
 /* ----------------------------------------------------------------
    HELPERS
 ---------------------------------------------------------------- */
@@ -352,23 +412,187 @@ ob_start();
         </table>
       </div>
     </div>
+
+    <?php if ($isChama): ?>
+  <!-- ======================= CHAMA REMITTANCE ======================= -->
+  <div class="row g-3 mt-3">
+    <div class="col-12 col-md-4">
+      <div class="mini-card h-100 d-flex flex-column">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span>Total Earned</span>
+          <i class="bi bi-cash-stack text-success fs-5"></i>
+        </div>
+        <strong class="fs-3"><?= gv_ksh($remittanceTotals['total']) ?></strong>
+        <small class="text-muted"><?= number_format($remittanceTotals['count_total']) ?> remittance(s)</small>
+      </div>
+    </div>
+    <div class="col-12 col-md-4">
+      <div class="mini-card h-100 d-flex flex-column">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span>Paid</span>
+          <i class="bi bi-check2-circle text-primary fs-5"></i>
+        </div>
+        <strong class="fs-3"><?= gv_ksh($remittanceTotals['total_paid']) ?></strong>
+        <small class="text-muted"><?= number_format($remittanceTotals['count_paid']) ?> settled</small>
+      </div>
+    </div>
+    <div class="col-12 col-md-4">
+      <div class="mini-card h-100 d-flex flex-column">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span>Pending</span>
+          <i class="bi bi-hourglass-split text-warning fs-5"></i>
+        </div>
+        <strong class="fs-3"><?= gv_ksh($remittanceTotals['total_pending']) ?></strong>
+        <small class="text-muted"><?= number_format($remittanceTotals['count_pending']) ?> awaiting payment</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel mt-3">
+    <div class="panel-header">
+      <div>
+        <h2 class="h5 mb-1 section-title">
+          <i class="bi bi-cash-coin" aria-hidden="true"></i>
+          <span>Chama Remittance</span>
+        </h2>
+        <p class="text-muted mb-0">Interest remittance earned as a chama guarantor.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <input type="search"
+               class="form-control form-control-sm"
+               id="remittanceSearch"
+               placeholder="Search remittances..."
+               style="max-width: 200px;">
+        <a class="btn btn-light btn-sm" href="chama-remittance-history.php">
+          <i class="bi bi-database" aria-hidden="true"></i> All History
+        </a>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="chamaRemittanceTable">
+        <thead class="table-light">
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Loan</th>
+            <th scope="col">Borrower</th>
+            <th scope="col" class="text-end">Base</th>
+            <th scope="col" class="text-end">Rate</th>
+            <th scope="col" class="text-end">Remittance</th>
+            <th scope="col">Status</th>
+            <th scope="col">Paid</th>
+            <th scope="col">Reference</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (empty($remittances)): ?>
+            <tr>
+              <td colspan="9" class="text-center text-muted py-4">
+                <i class="bi bi-inbox fs-4 d-block mb-1"></i>
+                No remittances recorded for this chama yet.
+              </td>
+            </tr>
+          <?php else: ?>
+            <?php foreach ($remittances as $i => $r): ?>
+              <?php
+                switch ($r['status']) {
+                    case 'paid':
+                        $rBadge = 'bg-success-subtle text-success-emphasis';
+                        break;
+                    case 'cancelled':
+                        $rBadge = 'bg-danger-subtle text-danger-emphasis';
+                        break;
+                    default:
+                        $rBadge = 'bg-warning-subtle text-warning-emphasis';
+                }
+              ?>
+              <tr data-status="<?= htmlspecialchars($r['status']) ?>">
+                <td><?= $i + 1 ?></td>
+                <td>
+                  <a href="loan-view.php?id=<?= (int)$r['loan_id'] ?>" class="fw-semibold text-decoration-none">
+                    <?= htmlspecialchars($r['loan_code']) ?>
+                  </a>
+                </td>
+                <td>
+                  <div class="fw-semibold"><?= htmlspecialchars($r['client_name']) ?></div>
+                  <?php if (!empty($r['client_email'])): ?>
+                    <small class="text-muted"><?= htmlspecialchars($r['client_email']) ?></small>
+                  <?php endif; ?>
+                </td>
+                <td class="text-end"><?= gv_ksh($r['base_amount']) ?></td>
+                <td class="text-end"><?= number_format((float)$r['rate'], 2) ?>%</td>
+                <td class="text-end fw-semibold text-success"><?= gv_ksh($r['remittance_amount']) ?></td>
+                <td><span class="badge <?= $rBadge ?>"><?= htmlspecialchars(ucfirst($r['status'])) ?></span></td>
+                <td><?= htmlspecialchars($r['paid_date'] ?? '—') ?></td>
+                <td><?= htmlspecialchars($r['reference_number'] ?? '—') ?></td>
+                <td class="text-end">
+                <?php if ($r['status'] === 'pending'): ?>
+                  <form method="post" action="chama-remittance-action.php"
+                        class="d-flex gap-1 justify-content-end align-items-center m-0"
+                        onsubmit="return confirm('Confirm this remittance has been paid? The loan\'s interest will be reduced by the remittance amount.');">
+                    <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                    <input type="text"
+                          name="reference_number"
+                          class="form-control form-control-sm"
+                          placeholder="Ref (optional)"
+                          style="max-width: 130px;">
+                    <button type="submit" class="btn btn-outline-success btn-sm" title="Confirm payment">
+                      <i class="bi bi-check2-circle" aria-hidden="true"></i> Mark paid
+                    </button>
+                  </form>
+                <?php else: ?>
+                  <span class="text-muted small">—</span>
+                <?php endif; ?>
+              </td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+        <?php if (!empty($remittances)): ?>
+          <tfoot class="table-light">
+            <tr>
+              <th colspan="5" class="text-end">Total</th>
+              <th class="text-end text-success"><?= gv_ksh($remittanceTotals['total']) ?></th>
+              <th colspan="3"></th>
+            </tr>
+          </tfoot>
+        <?php endif; ?>
+      </table>
+    </div>
+  </div>
+<?php endif; ?>
   </div>
 </section>
+
 
 <script>
 (() => {
   /* Client-side search filter for the guaranteed loans table */
-  const $search = document.getElementById('loanSearch');
-  const $table  = document.getElementById('guaranteedLoansTable');
-  if (!$search || !$table) return;
+  const $loanSearch = document.getElementById('loanSearch');
+  const $loanTable  = document.getElementById('guaranteedLoansTable');
 
-  $search.addEventListener('input', () => {
-    const q = $search.value.trim().toLowerCase();
-    const rows = $table.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-      row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  if ($loanSearch && $loanTable) {
+    $loanSearch.addEventListener('input', () => {
+      const q = $loanSearch.value.trim().toLowerCase();
+      $loanTable.querySelectorAll('tbody tr').forEach(row => {
+        row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
     });
-  });
+  }
+
+  /* Same for the chama remittance table */
+  const $remitSearch = document.getElementById('remittanceSearch');
+  const $remitTable  = document.getElementById('chamaRemittanceTable');
+
+  if ($remitSearch && $remitTable) {
+    $remitSearch.addEventListener('input', () => {
+      const q = $remitSearch.value.trim().toLowerCase();
+      $remitTable.querySelectorAll('tbody tr').forEach(row => {
+        row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  }
 })();
 </script>
 
