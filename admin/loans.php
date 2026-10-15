@@ -36,6 +36,9 @@ function accrue_monthly_interest(mysqli $conn, array $categories): int {
     $tiers = $categories['monthly']['tiers'] ?? [];
     if (empty($tiers)) return 0;
 
+    /* Hours to wait after a monthly billing date before applying interest */
+    $graceHours = 72;
+
     $sql = "SELECT id, date_issued, due_date,
                    principal_amount, principal_balance,
                    interest_rate, interest_amount, interest_balance,
@@ -57,6 +60,7 @@ function accrue_monthly_interest(mysqli $conn, array $categories): int {
     );
     if (!$update) { $res->free(); return 0; }
 
+    $now     = new DateTime('now');
     $today   = new DateTime('today');
     $changed = 0;
 
@@ -64,11 +68,12 @@ function accrue_monthly_interest(mysqli $conn, array $categories): int {
 
         $principal_amount  = (float) $loan['principal_amount'];
         $principal_balance = (float) $loan['principal_balance'];
-        $interest_amount   = (float) $loan['interest_amount'];   // running total billed
-        $interest_balance  = (float) $loan['interest_balance'];  // still owed
+        $interest_amount   = (float) $loan['interest_amount'];
+        $interest_balance  = (float) $loan['interest_balance'];
 
         if ($principal_balance <= 0) continue;
 
+        /* Tier rate — based on the ORIGINAL principal */
         $baseRate = null;
         foreach ($tiers as $t) {
             if ($principal_amount >= $t['min'] && $principal_amount <= $t['max']) {
@@ -78,35 +83,47 @@ function accrue_monthly_interest(mysqli $conn, array $categories): int {
         }
         if ($baseRate === null) continue;
 
+        /* Checkpoint — either stored, or "issue + 1 month" as fallback */
         if (!empty($loan['last_accrual_date'])) {
-            $checkpoint = new DateTime($loan['last_accrual_date']);
+            $checkpoint = new DateTime($loan['last_accrual_date'] . ' 00:00:00');
         } else {
-            $checkpoint = new DateTime($loan['date_issued']);
+            $checkpoint = new DateTime($loan['date_issued'] . ' 00:00:00');
             $checkpoint->modify('+1 month');
         }
 
-        $due    = new DateTime($loan['due_date']);
-        $freeze = (clone $due)->modify('+3 months');
-        $cap    = $today < $freeze ? $today : $freeze;
+        /* Freeze — 3 months past DUE date (not issue date) */
+        $due     = new DateTime($loan['due_date'] . ' 00:00:00');
+        $freeze  = (clone $due)->modify('+2 months');
 
-        /* Walk month by month, tracking how much is added this pass */
+        /* Cap the whole accrual at whichever is earlier: today's midnight, or the freeze */
+        $cap = $today < $freeze ? clone $today : clone $freeze;
+
+        /* Walk month by month */
         $interestAdded = 0.0;
         $monthsBilled  = 0;
 
         while (true) {
-            if ($checkpoint > $cap) break;
+            /* Billing candidate for this period */
+            $billingDate = clone $checkpoint;
 
-            $monthlyInterest = round($principal_balance * $baseRate / 100, 2);
+            /* Only bill if a full month has elapsed AND the 72h grace has passed */
+            $graceExpires = (clone $billingDate)->modify("+{$graceHours} hours");
+
+            if ($billingDate > $cap) break;         // past the freeze
+            if ($now < $graceExpires) break;        // still within grace
+
+            /* Apply the month's interest */
+            $monthlyInterest   = round($principal_balance * $baseRate / 100, 2);
             $interest_balance += $monthlyInterest;
             $interestAdded    += $monthlyInterest;
 
-            $checkpoint = (clone $checkpoint)->modify('+1 month');
+            /* Advance checkpoint to the billing date (start of the NEXT month) */
+            $checkpoint = (clone $billingDate)->modify('+1 month');
             $monthsBilled++;
         }
 
         if ($monthsBilled === 0) continue;
 
-        /* Add the same amount to the running total billed */
         $interest_amount = round($interest_amount + $interestAdded, 2);
 
         $id      = (int) $loan['id'];
@@ -349,9 +366,7 @@ ob_start();
     </div>
   </div>
   <div class="heading-actions">
-    <button class="btn btn-outline-secondary btn-sm" type="button">
-      <i class="bi bi-download" aria-hidden="true"></i> Export
-    </button>
+    
     <a class="btn btn-primary btn-sm" href="chama-remittance.php">
         <i class="bi bi-cash-stack" aria-hidden="true"></i> Chama remmitance
       </a>

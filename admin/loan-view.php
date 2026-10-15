@@ -303,7 +303,7 @@ ob_start();
         </div>
         <div class="col-md-6">
           <div class="mini-card">
-            <span>Total Due</span>
+            <span>Loan value</span>
             <strong><?= lv_ksh($loan['total_due']) ?></strong>
           </div>
         </div>
