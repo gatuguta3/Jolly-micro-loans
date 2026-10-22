@@ -158,7 +158,7 @@ function add_duration_units(DateTime $date, string $category, int $units): DateT
     if ($category === 'monthly') {
         $out->modify('+' . max(0, $units) . ' months');
     } else {
-        $out->modify('+' . max(0, $units) . ' days');
+        $out->modify('+' . max(0, $units) . ' months');
     }
 
     return $out;
@@ -189,7 +189,8 @@ function determine_loan_status(array $loan, DateTime $today): string {
     if ($current === 'cleared')     return 'cleared';
 
     /* Cleared wins */
-    $balance = (float) ($loan['balance'] ?? 0);
+    $balance = (float) ($loan['principal_balance'] ?? 0)
+             + (float) ($loan['interest_balance']  ?? 0);
     if ($balance <= 0.009) return 'cleared';
 
     $dueDate = new DateTime($loan['due_date']);
@@ -209,7 +210,7 @@ function determine_loan_status(array $loan, DateTime $today): string {
 
 function refresh_loan_statuses(mysqli $conn): int {
     $sql = "SELECT id, loan_category, date_issued, due_date, duration,
-                   principal_amount, amount_paid, balance, status
+                   principal_amount, amount_paid, balance,principal_balance, interest_balance, status
             FROM loans
             WHERE status NOT IN ('written_off','cleared')";
 

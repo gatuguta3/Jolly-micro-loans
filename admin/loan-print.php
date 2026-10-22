@@ -387,7 +387,7 @@ $summaryRows = [
 
     ['Principal Amount',      lp_ksh($loan['principal_amount']),  false, false],
     ['Interest Billed',       lp_ksh($loan['interest_amount']),   false, false],
-    ['Total Due',             lp_ksh($loan['total_due']),         false, false],
+    ['Loan value',             lp_ksh($loan['total_due']),         false, false],
 
     ['Paid', null, false, true],
 
